@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crypto Realized Volatility — 7-Day + HAR-RV Forecast</title>
+<title>Crypto Volatility + Liquidation Screener</title>
 <style>
 :root {
   --bg: #0f1117;
@@ -15,6 +15,7 @@
   --green: #26c281;
   --orange: #f5a623;
   --red: #e0556a;
+  --purple: #a78bfa;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -25,6 +26,7 @@ body {
   min-height: 100vh;
 }
 h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+h2 { font-size: 1.1rem; font-weight: 600; margin: 24px 0 12px 0; }
 .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
 .controls {
   display: flex;
@@ -132,6 +134,12 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .vol-low { color: var(--green); }
 .vol-mid { color: var(--orange); }
 .vol-high { color: var(--red); }
+.pressure-extreme { color: var(--red); font-weight: 600; }
+.pressure-high { color: var(--orange); font-weight: 600; }
+.pressure-moderate { color: var(--orange); }
+.pressure-low { color: var(--green); }
+.pressure-minimal { color: var(--muted); }
+.pressure-na { color: var(--muted); }
 .footer {
   margin-top: 20px;
   color: var(--muted);
@@ -149,24 +157,84 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   line-height: 1.5;
 }
 .note strong { color: var(--text); }
+.signal-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: rgba(255,255,255,0.05);
+}
+.signal-long_squeeze_risk { background: rgba(224,85,106,0.2); color: var(--red); }
+.signal-short_squeeze_risk { background: rgba(38,194,129,0.2); color: var(--green); }
+.signal-high_carry_cost { background: rgba(245,166,35,0.2); color: var(--orange); }
+.signal-negative_carry { background: rgba(167,139,250,0.2); color: var(--purple); }
+.signal-large_oi { background: rgba(167,139,250,0.2); color: var(--purple); }
+.signal-normal { background: rgba(255,255,255,0.05); color: var(--muted); }
+.whale-liqs {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.liq-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.liq-token {
+  display: inline-block;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.liq-token-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+.liq-level {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.liq-notional {
+  color: var(--orange);
+  font-weight: 500;
+}
+.impact-high { color: var(--red); font-weight: 600; }
+.impact-mid { color: var(--orange); }
+.impact-low { color: var(--green); }
 </style>
 </head>
 <body>
 
-<h1>Crypto Realized Volatility</h1>
-<div class="subtitle">7-day annualized realized vol + HAR-RV forecast · Coinbase perpetual futures · Sep 07, 2026 19:59 UTC</div>
+<h1>Crypto Volatility + Liquidation Screener</h1>
+<div class="subtitle">7-day realized vol + HAR-RV forecast + liquidation levels + small names impact · Sep 09, 2026 17:02 UTC</div>
 
 <div class="note">
-  <strong>Models:</strong> <strong>CC</strong> = Close-to-Close (log returns, std × √365) · <strong>PK</strong> = Parkinson (high-low, most efficient for 24/7) · <strong>HAR-RV</strong> = Heterogeneous Autoregressive forecast (daily/weekly/monthly RV components). 
-  Volume = CDE perp 24h USD notional. HAR-RV uses ~46 days of history — treat as proof of concept, not trading signal.
+  <strong>Models:</strong> <strong>CC</strong> = Close-to-Close (log returns) · <strong>PK</strong> = Parkinson (high-low) · <strong>HAR-RV</strong> = Heterogeneous Autoregressive forecast · 
+  <strong>Pressure</strong> = Liquidation pressure score (0-100) from OI size + funding cost · <strong>Liquidations</strong> = Calculated from 184 wallet positions using Hyperliquid formula.
+  <strong>Small Names Impact</strong> = Estimated move if liquidations trigger (accounts for thin volume).
 </div>
 
+<h2>🔥 Small Names Liquidation Impact</h2>
+<div class="liq-section" id="small-name-section">
+  <div id="small-name-tokens"></div>
+</div>
+
+<h2>📊 Volatility + Liquidation Table</h2>
 <div class="controls">
   <div class="btn-group">
     <span class="btn-group-label">Sort by</span>
     <button class="active" data-sort="cc" data-dir="desc">CC ↓</button>
     <button data-sort="pk" data-dir="desc">PK ↓</button>
     <button data-sort="har" data-dir="desc">HAR-RV ↓</button>
+    <button data-sort="pressure" data-dir="desc">Pressure ↓</button>
     <button data-sort="vol" data-dir="desc">Volume ↓</button>
     <button data-sort="name" data-dir="asc">Name ↑</button>
   </div>
@@ -181,18 +249,25 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       <th data-sort="cc">CC (7d) <span class="arrow"></span></th>
       <th data-sort="pk">PK (7d) <span class="arrow"></span></th>
       <th data-sort="har">HAR-RV (fcast) <span class="arrow"></span></th>
+      <th data-sort="oi">OI ($) <span class="arrow"></span></th>
+      <th data-sort="funding">Funding (APR) <span class="arrow"></span></th>
+      <th data-sort="pressure">Pressure <span class="arrow"></span></th>
     </tr>
   </thead>
   <tbody id="table-body"></tbody>
 </table>
 
 <div class="footer">
-  Data: Coinbase Derivatives Exchange (CDE) perpetual candles · Auto-refreshes daily at 8:00 AM CDT<br>
-  HAR-RV coefficients fitted via OLS on daily Parkinson RV with 5-day weekly and 22-day monthly lookbacks.
+  Data: Coinbase Derivatives Exchange (CDE) perpetual candles + OI/funding · Hyperliquid wallet positions via public API · Computed: Sep 09, 2026 17:02 UTC<br>
+  HAR-RV coefficients fitted via OLS on daily Parkinson RV with 5-day weekly and 22-day monthly lookbacks.<br>
+  Liquidation prices calculated using Hyperliquid formula: liq = entry × (1 ± 1/L + mmr).<br>
+  184 wallets scanned (64 known + 122 discovered). Not financial advice.
 </div>
 
 <script>
-const DATA = [{"token": "ADA", "vol": 3636915.3, "cc": 91.7, "pk": 83.4, "har": 58.4}, {"token": "AVAX", "vol": 1042039.6, "cc": 47.3, "pk": 48.1, "har": 57.4}, {"token": "BCH", "vol": 1804005.0, "cc": 55.5, "pk": 63.8, "har": 62.4}, {"token": "BNB", "vol": 200743.25, "cc": 69.2, "pk": 41.7, "har": 32.6}, {"token": "BTC", "vol": 120704374.7, "cc": 46.9, "pk": 40.3, "har": 32.6}, {"token": "DOGE", "vol": 1745341.2, "cc": 77.3, "pk": 78.1, "har": 45.7}, {"token": "DOT", "vol": 2345694.4, "cc": 61.8, "pk": 86.9, "har": 141.3}, {"token": "ETH", "vol": 35008028.6, "cc": 47.3, "pk": 45.6, "har": 31.9}, {"token": "HBAR", "vol": 3539486.25, "cc": 48.3, "pk": 51.5, "har": 44.3}, {"token": "HYPE", "vol": 5078509.8, "cc": 74.0, "pk": 60.0, "har": 49.1}, {"token": "LINK", "vol": 8161861.5, "cc": 97.3, "pk": 76.7, "har": 74.2}, {"token": "LTC", "vol": 2008424.7, "cc": 62.9, "pk": 65.6, "har": 72.6}, {"token": "SHIB", "vol": 682273.1, "cc": 51.0, "pk": 50.7, "har": 42.7}, {"token": "SOL", "vol": 24203516.7, "cc": 46.2, "pk": 52.7, "har": 35.6}, {"token": "SUI", "vol": 4480256.4, "cc": 61.2, "pk": 82.3, "har": 87.8}, {"token": "XLM", "vol": 6303082.5, "cc": 52.4, "pk": 66.1, "har": 79.8}, {"token": "XRP", "vol": 23438096.0, "cc": 70.1, "pk": 61.1, "har": 54.8}];
+const DATA = [{"token": "ADA", "vol": 6858645.0, "cc": 54.8, "pk": 86.8, "har": 50.4, "oi_usd": 1789830.95, "funding_apr": -21.9, "pressure_score": 10.9, "pressure_label": "low", "signal": "negative_carry", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "AVAX", "vol": 755014.6, "cc": 47.3, "pk": 52.9, "har": 49.9, "oi_usd": 753190.2, "funding_apr": -14.89, "pressure_score": 7.4, "pressure_label": "minimal", "signal": "negative_carry", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "BCH", "vol": 7870549.5, "cc": 42.8, "pk": 64.6, "har": 50.2, "oi_usd": 486661.35, "funding_apr": -7.01, "pressure_score": 3.5, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "BNB", "vol": 214018.95, "cc": 61.0, "pk": 44.1, "har": 35.6, "oi_usd": 350890.35, "funding_apr": 10.51, "pressure_score": 5.3, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "BTC", "vol": 365185277.3, "cc": 21.0, "pk": 38.7, "har": 28.8, "oi_usd": 142486154.625, "funding_apr": 2.63, "pressure_score": 14.4, "pressure_label": "low", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "DOGE", "vol": 5149699.1, "cc": 58.4, "pk": 79.3, "har": 50.7, "oi_usd": 1130231.8, "funding_apr": 3.5, "pressure_score": 1.8, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "DOT", "vol": 3498208.0, "cc": 165.3, "pk": 129.1, "har": 114.5, "oi_usd": 573981.1, "funding_apr": 0.0, "pressure_score": 0, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "ETH", "vol": 76947415.2, "cc": 24.6, "pk": 42.4, "har": 25.4, "oi_usd": 70502387.2, "funding_apr": 3.5, "pressure_score": 8.7, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "HBAR", "vol": 9979124.4, "cc": 41.7, "pk": 55.5, "har": 38.9, "oi_usd": 966428.325, "funding_apr": 9.64, "pressure_score": 4.8, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "HYPE", "vol": 12400872.0, "cc": 49.1, "pk": 59.6, "har": 44.6, "oi_usd": 7442878.6, "funding_apr": -10.51, "pressure_score": 5.3, "pressure_label": "minimal", "signal": "negative_carry", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "LINK", "vol": 8192589.75, "cc": 100.3, "pk": 83.8, "har": 71.5, "oi_usd": 2833759.5, "funding_apr": 14.89, "pressure_score": 7.4, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "LTC", "vol": 1589009.0, "cc": 66.2, "pk": 66.3, "har": 46.7, "oi_usd": 932622.625, "funding_apr": 14.02, "pressure_score": 7.0, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "SHIB", "vol": 108299.4, "cc": 44.8, "pk": 52.0, "har": 42.4, "oi_usd": 174850.95, "funding_apr": -8.76, "pressure_score": 4.4, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "SOL", "vol": 28639544.0, "cc": 41.0, "pk": 47.2, "har": 23.4, "oi_usd": 17549494.225, "funding_apr": 2.63, "pressure_score": 1.3, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "SUI", "vol": 8538979.65, "cc": 58.9, "pk": 81.4, "har": 61.3, "oi_usd": 2017217.6, "funding_apr": 10.51, "pressure_score": 5.3, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "XLM", "vol": 8863249.5, "cc": 54.8, "pk": 66.3, "har": 46.2, "oi_usd": 3262341.6, "funding_apr": 11.39, "pressure_score": 5.7, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}, {"token": "XRP", "vol": 66025880.55, "cc": 38.4, "pk": 61.4, "har": 46.7, "oi_usd": 32381487.450000003, "funding_apr": 1.75, "pressure_score": 1.1, "pressure_label": "minimal", "signal": "normal", "whale_data": {"whales": [], "long_liqs": [], "short_liqs": []}}];
+const LIQ_LEVELS = {"ADA": [{"price": 0.2, "notional": 1444846.7682939998, "count": 30}, {"price": 0.3, "notional": 3977.101872, "count": 6}, {"price": 0.6, "notional": 14385.962617, "count": 1}], "AVAX": [{"price": 0.4, "notional": 12.041646, "count": 1}, {"price": 4.4, "notional": 21596.42505, "count": 2}, {"price": 5.4, "notional": 287.80972, "count": 1}, {"price": 6.1, "notional": 460418.142816, "count": 1}, {"price": 6.6, "notional": 494.78756400000003, "count": 1}, {"price": 6.7, "notional": 649.2324120000001, "count": 1}, {"price": 6.8, "notional": 199.954416, "count": 1}, {"price": 6.9, "notional": 2.694766, "count": 1}, {"price": 7.1, "notional": 166396.636854, "count": 1}, {"price": 7.2, "notional": 488.51036700000003, "count": 1}, {"price": 7.5, "notional": 10868.442412, "count": 5}, {"price": 7.6, "notional": 30070.627704, "count": 1}, {"price": 7.7, "notional": 6957.384215999999, "count": 2}, {"price": 7.9, "notional": 80230.15286100001, "count": 2}, {"price": 8.2, "notional": 321369.622784, "count": 2}, {"price": 8.3, "notional": 96049.720724, "count": 10}, {"price": 8.4, "notional": 9031.077925, "count": 3}, {"price": 8.5, "notional": 41.840413999999996, "count": 1}, {"price": 8.7, "notional": 173.744811, "count": 1}, {"price": 9.1, "notional": 236695.90494, "count": 1}, {"price": 12, "notional": 10859.696316, "count": 1}, {"price": 14, "notional": 1053397.341482, "count": 1}], "BCH": [{"price": 140, "notional": 876.5720249999999, "count": 1}, {"price": 220, "notional": 132.992986, "count": 1}, {"price": 230, "notional": 242416.61046, "count": 1}, {"price": 240, "notional": 75877.30691, "count": 4}, {"price": 250, "notional": 14236.263524999998, "count": 4}, {"price": 260, "notional": 206849.32167900002, "count": 3}, {"price": 270, "notional": 91445.775836, "count": 11}, {"price": 290, "notional": 119580.026338, "count": 2}, {"price": 300, "notional": 1146.7535500000001, "count": 2}, {"price": 370, "notional": 8470.501479, "count": 2}], "BNB": [{"price": 37, "notional": 12.584760000000001, "count": 1}, {"price": 410, "notional": 987.2596289999999, "count": 1}, {"price": 540, "notional": 1597.3045759999998, "count": 1}, {"price": 550, "notional": 39.987222, "count": 2}, {"price": 600, "notional": 788659.70658, "count": 1}, {"price": 610, "notional": 590036.152051, "count": 3}, {"price": 620, "notional": 11224.35662, "count": 1}, {"price": 650, "notional": 247735.32644900004, "count": 2}, {"price": 660, "notional": 307324.79335299996, "count": 2}, {"price": 670, "notional": 11.844479999999999, "count": 1}, {"price": 690, "notional": 328985.328564, "count": 1}, {"price": 700, "notional": 37503.897834999996, "count": 9}, {"price": 710, "notional": 889439.4185930002, "count": 5}, {"price": 730, "notional": 3504.8046689999996, "count": 1}, {"price": 740, "notional": 3313.4410420000004, "count": 2}, {"price": 750, "notional": 118461.65818500001, "count": 2}, {"price": 760, "notional": 11.8016, "count": 1}, {"price": 770, "notional": 10.32752, "count": 1}, {"price": 780, "notional": 12847.289603000003, "count": 3}, {"price": 790, "notional": 236.66054400000002, "count": 1}, {"price": 800, "notional": 1137715.550755, "count": 1}, {"price": 810, "notional": 1086225.0, "count": 1}, {"price": 850, "notional": 691.57563, "count": 1}, {"price": 860, "notional": 1397581.2004380003, "count": 1}, {"price": 1000, "notional": 19381.708280000003, "count": 2}], "BTC": [{"price": 41500, "notional": 52275.665764, "count": 2}, {"price": 44000, "notional": 171535.364928, "count": 1}, {"price": 50500, "notional": 72771200.0, "count": 1}, {"price": 62500, "notional": 62353600.0, "count": 1}, {"price": 65500, "notional": 44432.001208, "count": 3}, {"price": 69500, "notional": 429.88753999999994, "count": 1}, {"price": 71000, "notional": 1179.2847840000002, "count": 1}, {"price": 73500, "notional": 720075.083772, "count": 2}, {"price": 74000, "notional": 1228.9484909999999, "count": 1}, {"price": 76000, "notional": 61212411.612674996, "count": 2}, {"price": 77000, "notional": 66471236.54255, "count": 5}, {"price": 77500, "notional": 118187728.5584, "count": 5}, {"price": 78000, "notional": 10749230.078917, "count": 9}, {"price": 78500, "notional": 33014977.030408002, "count": 11}, {"price": 79000, "notional": 23087707.176443003, "count": 7}, {"price": 79500, "notional": 96965.636258, "count": 4}, {"price": 80000, "notional": 2165464.6336850002, "count": 4}, {"price": 80500, "notional": 56646896.850509994, "count": 8}, {"price": 84000, "notional": 235.707, "count": 1}, {"price": 84500, "notional": 189970616.421426, "count": 4}, {"price": 92000, "notional": 65069.488548999994, "count": 1}, {"price": 94000, "notional": 6786.5196000000005, "count": 2}, {"price": 96000, "notional": 17603832.439417, "count": 1}, {"price": 100500, "notional": 8757742.438564, "count": 1}, {"price": 102500, "notional": 841141.714131, "count": 4}, {"price": 104000, "notional": 30.266240000000003, "count": 1}, {"price": 116500, "notional": 301152.169008, "count": 1}, {"price": 117000, "notional": 139.41655, "count": 1}], "DOGE": [{"price": 0.0, "notional": 21577.295194000002, "count": 3}, {"price": 0.1, "notional": 18387914.920348, "count": 45}], "DOT": [{"price": 0.8, "notional": 27816.786257, "count": 3}, {"price": 0.9, "notional": 12823.356105, "count": 2}, {"price": 1.0, "notional": 1676.240398, "count": 2}, {"price": 1.1, "notional": 233673.53645200003, "count": 10}, {"price": 1.2, "notional": 192758.22978799997, "count": 1}, {"price": 1.3, "notional": 3041.5241039999996, "count": 1}, {"price": 1.5, "notional": 3586.4466880000004, "count": 1}], "ETH": [{"price": 1500, "notional": 56680615.651074, "count": 11}, {"price": 2000, "notional": 64945442.868823, "count": 4}, {"price": 2500, "notional": 799657986.3936472, "count": 55}, {"price": 3000, "notional": 7249.264932, "count": 1}, {"price": 3500, "notional": 314219.992885, "count": 1}], "HBAR": [{"price": 0.1, "notional": 654561.157663, "count": 20}], "HYPE": [{"price": 2.4, "notional": 8796.252620000001, "count": 1}, {"price": 4.3, "notional": 12.846, "count": 1}, {"price": 33, "notional": 53373839.89682999, "count": 1}, {"price": 47, "notional": 3644.81844, "count": 2}, {"price": 54, "notional": 803.68366, "count": 1}, {"price": 61, "notional": 207933.788856, "count": 4}, {"price": 62, "notional": 49.680402, "count": 1}, {"price": 63, "notional": 1354437.0221459998, "count": 2}, {"price": 64, "notional": 13538399.999999998, "count": 1}, {"price": 66, "notional": 170839.60679, "count": 1}, {"price": 67, "notional": 100601.175825, "count": 1}, {"price": 70, "notional": 1540430.277204, "count": 1}, {"price": 73, "notional": 2480.8018380000003, "count": 2}, {"price": 75, "notional": 56550499.005647, "count": 3}, {"price": 78, "notional": 17955.28644, "count": 1}, {"price": 79, "notional": 58340380.19354999, "count": 2}, {"price": 80, "notional": 505.92474400000003, "count": 1}, {"price": 81, "notional": 1827344.364881, "count": 15}, {"price": 82, "notional": 20250948.617431, "count": 3}, {"price": 84, "notional": 12993003.028145, "count": 2}, {"price": 85, "notional": 819455.63256, "count": 2}, {"price": 86, "notional": 7386.0761760000005, "count": 1}, {"price": 88, "notional": 87961.63481, "count": 1}, {"price": 90, "notional": 54250.60123700001, "count": 4}, {"price": 94, "notional": 25869658.903775997, "count": 1}, {"price": 97, "notional": 54994152.27201, "count": 2}, {"price": 98, "notional": 1345.897668, "count": 1}, {"price": 99, "notional": 8893567.043532, "count": 2}, {"price": 110, "notional": 2484719.9398840005, "count": 2}], "LINK": [{"price": 5.4, "notional": 12.76411, "count": 1}, {"price": 6.6, "notional": 199.13949, "count": 1}, {"price": 6.9, "notional": 137.047335, "count": 1}, {"price": 7.5, "notional": 17111.598336, "count": 1}, {"price": 8.2, "notional": 243.81863, "count": 1}, {"price": 8.7, "notional": 54.5715, "count": 1}, {"price": 9.1, "notional": 148.04082400000001, "count": 1}, {"price": 10, "notional": 381937.847156, "count": 3}, {"price": 11, "notional": 3702525.3599609993, "count": 13}, {"price": 12, "notional": 4384959.266564, "count": 11}, {"price": 13, "notional": 63699.87154000001, "count": 8}, {"price": 15, "notional": 4890863.519976, "count": 1}, {"price": 16, "notional": 1789417.2030679998, "count": 1}, {"price": 17, "notional": 4286.4446849999995, "count": 1}], "LTC": [{"price": 30, "notional": 489.352922, "count": 1}, {"price": 45, "notional": 165.11613300000002, "count": 1}, {"price": 46, "notional": 21656.341232, "count": 2}, {"price": 47, "notional": 231.526256, "count": 1}, {"price": 50, "notional": 231285.652776, "count": 2}, {"price": 51, "notional": 1032207.446109, "count": 1}, {"price": 52, "notional": 15835.067933999999, "count": 3}, {"price": 55, "notional": 618679.2929100001, "count": 3}, {"price": 56, "notional": 3127.6762660000004, "count": 3}, {"price": 57, "notional": 1566659.453371, "count": 11}, {"price": 58, "notional": 52165.73467, "count": 1}, {"price": 60, "notional": 508801.769138, "count": 2}, {"price": 62, "notional": 1612.4811320000001, "count": 2}, {"price": 73, "notional": 621461.1738400001, "count": 1}], "SHIB": [{"price": 0.0, "notional": 757076.928261, "count": 11}], "SOL": [{"price": 57, "notional": 293.80339599999996, "count": 1}, {"price": 59, "notional": 137198.866056, "count": 1}, {"price": 72, "notional": 19.142500000000002, "count": 1}, {"price": 75, "notional": 29622676.436139997, "count": 1}, {"price": 76, "notional": 128.69053200000002, "count": 2}, {"price": 81, "notional": 44478935.42925099, "count": 1}, {"price": 88, "notional": 49.5312, "count": 1}, {"price": 89, "notional": 746.3727200000001, "count": 1}, {"price": 95, "notional": 4019900.405144, "count": 2}, {"price": 96, "notional": 1098354.494224, "count": 1}, {"price": 97, "notional": 332.39344, "count": 1}, {"price": 99, "notional": 73451034.424005, "count": 1}, {"price": 100, "notional": 74523438.74182299, "count": 37}, {"price": 120, "notional": 25648.583347, "count": 3}, {"price": 130, "notional": 12136.707881999999, "count": 2}, {"price": 150, "notional": 210144.256048, "count": 1}], "SUI": [{"price": 0.4, "notional": 12.006944, "count": 1}, {"price": 0.6, "notional": 121.60489799999999, "count": 2}, {"price": 0.7, "notional": 639242.3048219999, "count": 5}, {"price": 0.8, "notional": 5552016.673515999, "count": 25}, {"price": 0.9, "notional": 331423.38732700003, "count": 6}, {"price": 1.0, "notional": 457484.164358, "count": 2}, {"price": 1.2, "notional": 133.883424, "count": 1}, {"price": 1.6, "notional": 64.8064, "count": 1}, {"price": 3.9, "notional": 1.838805, "count": 1}], "XLM": [{"price": 0.2, "notional": 1588290.9338490001, "count": 25}], "XRP": [{"price": 0.8, "notional": 43.038000000000004, "count": 1}, {"price": 1.0, "notional": 3934.936507, "count": 2}, {"price": 1.1, "notional": 39578859.9283, "count": 1}, {"price": 1.2, "notional": 4934.0262, "count": 2}, {"price": 1.3, "notional": 10334532.236826, "count": 4}, {"price": 1.4, "notional": 7920414.682382, "count": 34}, {"price": 1.5, "notional": 2474129.6796, "count": 1}, {"price": 1.6, "notional": 7586117.2795049995, "count": 2}, {"price": 1.7, "notional": 26379643.52846, "count": 1}, {"price": 1.8, "notional": 9330.405143, "count": 3}, {"price": 1.9, "notional": 1507738.176624, "count": 1}]};
+const SMALL_NAME_ANALYSIS = [{"token": "BNB", "vol": 214018.95, "vol_pct": 61.0, "total_notional": 6983538.978978001, "num_positions": 47, "notional_pct_vol": 3263.047024096698, "est_move_pct": 16315.235120483489, "positions": [{"price": 37, "notional": 12.584760000000001, "count": 1}, {"price": 410, "notional": 987.2596289999999, "count": 1}, {"price": 540, "notional": 1597.3045759999998, "count": 1}, {"price": 550, "notional": 39.987222, "count": 2}, {"price": 600, "notional": 788659.70658, "count": 1}, {"price": 610, "notional": 590036.152051, "count": 3}, {"price": 620, "notional": 11224.35662, "count": 1}, {"price": 650, "notional": 247735.32644900004, "count": 2}, {"price": 660, "notional": 307324.79335299996, "count": 2}, {"price": 670, "notional": 11.844479999999999, "count": 1}, {"price": 690, "notional": 328985.328564, "count": 1}, {"price": 700, "notional": 37503.897834999996, "count": 9}, {"price": 710, "notional": 889439.4185930002, "count": 5}, {"price": 730, "notional": 3504.8046689999996, "count": 1}, {"price": 740, "notional": 3313.4410420000004, "count": 2}, {"price": 750, "notional": 118461.65818500001, "count": 2}, {"price": 760, "notional": 11.8016, "count": 1}, {"price": 770, "notional": 10.32752, "count": 1}, {"price": 780, "notional": 12847.289603000003, "count": 3}, {"price": 790, "notional": 236.66054400000002, "count": 1}, {"price": 800, "notional": 1137715.550755, "count": 1}, {"price": 810, "notional": 1086225.0, "count": 1}, {"price": 850, "notional": 691.57563, "count": 1}, {"price": 860, "notional": 1397581.2004380003, "count": 1}, {"price": 1000, "notional": 19381.708280000003, "count": 2}]}, {"token": "HYPE", "vol": 12400872.0, "vol_pct": 49.1, "total_notional": 313495404.27310205, "num_positions": 62, "notional_pct_vol": 2528.010967882759, "est_move_pct": 12640.054839413795, "positions": [{"price": 2.4, "notional": 8796.252620000001, "count": 1}, {"price": 4.3, "notional": 12.846, "count": 1}, {"price": 33, "notional": 53373839.89682999, "count": 1}, {"price": 47, "notional": 3644.81844, "count": 2}, {"price": 54, "notional": 803.68366, "count": 1}, {"price": 61, "notional": 207933.788856, "count": 4}, {"price": 62, "notional": 49.680402, "count": 1}, {"price": 63, "notional": 1354437.0221459998, "count": 2}, {"price": 64, "notional": 13538399.999999998, "count": 1}, {"price": 66, "notional": 170839.60679, "count": 1}, {"price": 67, "notional": 100601.175825, "count": 1}, {"price": 70, "notional": 1540430.277204, "count": 1}, {"price": 73, "notional": 2480.8018380000003, "count": 2}, {"price": 75, "notional": 56550499.005647, "count": 3}, {"price": 78, "notional": 17955.28644, "count": 1}, {"price": 79, "notional": 58340380.19354999, "count": 2}, {"price": 80, "notional": 505.92474400000003, "count": 1}, {"price": 81, "notional": 1827344.364881, "count": 15}, {"price": 82, "notional": 20250948.617431, "count": 3}, {"price": 84, "notional": 12993003.028145, "count": 2}, {"price": 85, "notional": 819455.63256, "count": 2}, {"price": 86, "notional": 7386.0761760000005, "count": 1}, {"price": 88, "notional": 87961.63481, "count": 1}, {"price": 90, "notional": 54250.60123700001, "count": 4}, {"price": 94, "notional": 25869658.903775997, "count": 1}, {"price": 97, "notional": 54994152.27201, "count": 2}, {"price": 98, "notional": 1345.897668, "count": 1}, {"price": 99, "notional": 8893567.043532, "count": 2}, {"price": 110, "notional": 2484719.9398840005, "count": 2}]}, {"token": "SOL", "vol": 28639544.0, "vol_pct": 41.0, "total_notional": 227581038.27770796, "num_positions": 57, "notional_pct_vol": 794.639182375627, "est_move_pct": 3973.195911878135, "positions": [{"price": 57, "notional": 293.80339599999996, "count": 1}, {"price": 59, "notional": 137198.866056, "count": 1}, {"price": 72, "notional": 19.142500000000002, "count": 1}, {"price": 75, "notional": 29622676.436139997, "count": 1}, {"price": 76, "notional": 128.69053200000002, "count": 2}, {"price": 81, "notional": 44478935.42925099, "count": 1}, {"price": 88, "notional": 49.5312, "count": 1}, {"price": 89, "notional": 746.3727200000001, "count": 1}, {"price": 95, "notional": 4019900.405144, "count": 2}, {"price": 96, "notional": 1098354.494224, "count": 1}, {"price": 97, "notional": 332.39344, "count": 1}, {"price": 99, "notional": 73451034.424005, "count": 1}, {"price": 100, "notional": 74523438.74182299, "count": 37}, {"price": 120, "notional": 25648.583347, "count": 3}, {"price": 130, "notional": 12136.707881999999, "count": 2}, {"price": 150, "notional": 210144.256048, "count": 1}]}, {"token": "SHIB", "vol": 108299.4, "vol_pct": 44.8, "total_notional": 757076.928261, "num_positions": 11, "notional_pct_vol": 699.0592083252538, "est_move_pct": 3495.2960416262695, "positions": [{"price": 0.0, "notional": 757076.928261, "count": 11}]}, {"token": "DOGE", "vol": 5149699.1, "vol_pct": 58.4, "total_notional": 18409492.215542, "num_positions": 48, "notional_pct_vol": 357.48675520754216, "est_move_pct": 1787.4337760377107, "positions": [{"price": 0.0, "notional": 21577.295194000002, "count": 3}, {"price": 0.1, "notional": 18387914.920348, "count": 45}]}, {"token": "AVAX", "vol": 755014.6, "vol_pct": 47.3, "total_notional": 2506291.7922, "num_positions": 41, "notional_pct_vol": 331.9527585559273, "est_move_pct": 1659.7637927796363, "positions": [{"price": 0.4, "notional": 12.041646, "count": 1}, {"price": 4.4, "notional": 21596.42505, "count": 2}, {"price": 5.4, "notional": 287.80972, "count": 1}, {"price": 6.1, "notional": 460418.142816, "count": 1}, {"price": 6.6, "notional": 494.78756400000003, "count": 1}, {"price": 6.7, "notional": 649.2324120000001, "count": 1}, {"price": 6.8, "notional": 199.954416, "count": 1}, {"price": 6.9, "notional": 2.694766, "count": 1}, {"price": 7.1, "notional": 166396.636854, "count": 1}, {"price": 7.2, "notional": 488.51036700000003, "count": 1}, {"price": 7.5, "notional": 10868.442412, "count": 5}, {"price": 7.6, "notional": 30070.627704, "count": 1}, {"price": 7.7, "notional": 6957.384215999999, "count": 2}, {"price": 7.9, "notional": 80230.15286100001, "count": 2}, {"price": 8.2, "notional": 321369.622784, "count": 2}, {"price": 8.3, "notional": 96049.720724, "count": 10}, {"price": 8.4, "notional": 9031.077925, "count": 3}, {"price": 8.5, "notional": 41.840413999999996, "count": 1}, {"price": 8.7, "notional": 173.744811, "count": 1}, {"price": 9.1, "notional": 236695.90494, "count": 1}, {"price": 12, "notional": 10859.696316, "count": 1}, {"price": 14, "notional": 1053397.341482, "count": 1}]}, {"token": "LTC", "vol": 1589009.0, "vol_pct": 66.2, "total_notional": 4674378.084689001, "num_positions": 34, "notional_pct_vol": 294.16939014750704, "est_move_pct": 1470.8469507375353, "positions": [{"price": 30, "notional": 489.352922, "count": 1}, {"price": 45, "notional": 165.11613300000002, "count": 1}, {"price": 46, "notional": 21656.341232, "count": 2}, {"price": 47, "notional": 231.526256, "count": 1}, {"price": 50, "notional": 231285.652776, "count": 2}, {"price": 51, "notional": 1032207.446109, "count": 1}, {"price": 52, "notional": 15835.067933999999, "count": 3}, {"price": 55, "notional": 618679.2929100001, "count": 3}, {"price": 56, "notional": 3127.6762660000004, "count": 3}, {"price": 57, "notional": 1566659.453371, "count": 11}, {"price": 58, "notional": 52165.73467, "count": 1}, {"price": 60, "notional": 508801.769138, "count": 2}, {"price": 62, "notional": 1612.4811320000001, "count": 2}, {"price": 73, "notional": 621461.1738400001, "count": 1}]}, {"token": "LINK", "vol": 8192589.75, "vol_pct": 100.3, "total_notional": 15235596.493175, "num_positions": 45, "notional_pct_vol": 185.96801448742139, "est_move_pct": 929.840072437107, "positions": [{"price": 5.4, "notional": 12.76411, "count": 1}, {"price": 6.6, "notional": 199.13949, "count": 1}, {"price": 6.9, "notional": 137.047335, "count": 1}, {"price": 7.5, "notional": 17111.598336, "count": 1}, {"price": 8.2, "notional": 243.81863, "count": 1}, {"price": 8.7, "notional": 54.5715, "count": 1}, {"price": 9.1, "notional": 148.04082400000001, "count": 1}, {"price": 10, "notional": 381937.847156, "count": 3}, {"price": 11, "notional": 3702525.3599609993, "count": 13}, {"price": 12, "notional": 4384959.266564, "count": 11}, {"price": 13, "notional": 63699.87154000001, "count": 8}, {"price": 15, "notional": 4890863.519976, "count": 1}, {"price": 16, "notional": 1789417.2030679998, "count": 1}, {"price": 17, "notional": 4286.4446849999995, "count": 1}]}, {"token": "XRP", "vol": 66025880.55, "vol_pct": 38.4, "total_notional": 95799677.91754699, "num_positions": 52, "notional_pct_vol": 145.09413145198408, "est_move_pct": 725.4706572599205, "positions": [{"price": 0.8, "notional": 43.038000000000004, "count": 1}, {"price": 1.0, "notional": 3934.936507, "count": 2}, {"price": 1.1, "notional": 39578859.9283, "count": 1}, {"price": 1.2, "notional": 4934.0262, "count": 2}, {"price": 1.3, "notional": 10334532.236826, "count": 4}, {"price": 1.4, "notional": 7920414.682382, "count": 34}, {"price": 1.5, "notional": 2474129.6796, "count": 1}, {"price": 1.6, "notional": 7586117.2795049995, "count": 2}, {"price": 1.7, "notional": 26379643.52846, "count": 1}, {"price": 1.8, "notional": 9330.405143, "count": 3}, {"price": 1.9, "notional": 1507738.176624, "count": 1}]}, {"token": "SUI", "vol": 8538979.65, "vol_pct": 58.9, "total_notional": 6980500.6704939995, "num_positions": 44, "notional_pct_vol": 81.74865097018939, "est_move_pct": 408.7432548509469, "positions": [{"price": 0.4, "notional": 12.006944, "count": 1}, {"price": 0.6, "notional": 121.60489799999999, "count": 2}, {"price": 0.7, "notional": 639242.3048219999, "count": 5}, {"price": 0.8, "notional": 5552016.673515999, "count": 25}, {"price": 0.9, "notional": 331423.38732700003, "count": 6}, {"price": 1.0, "notional": 457484.164358, "count": 2}, {"price": 1.2, "notional": 133.883424, "count": 1}, {"price": 1.6, "notional": 64.8064, "count": 1}, {"price": 3.9, "notional": 1.838805, "count": 1}]}, {"token": "ADA", "vol": 6858645.0, "vol_pct": 54.8, "total_notional": 1463209.8327829998, "num_positions": 37, "notional_pct_vol": 21.333803291801804, "est_move_pct": 106.66901645900901, "positions": [{"price": 0.2, "notional": 1444846.7682939998, "count": 30}, {"price": 0.3, "notional": 3977.101872, "count": 6}, {"price": 0.6, "notional": 14385.962617, "count": 1}]}, {"token": "XLM", "vol": 8863249.5, "vol_pct": 54.8, "total_notional": 1588290.9338490001, "num_positions": 25, "notional_pct_vol": 17.919961903915716, "est_move_pct": 89.59980951957859, "positions": [{"price": 0.2, "notional": 1588290.9338490001, "count": 25}]}, {"token": "DOT", "vol": 3498208.0, "vol_pct": 165.3, "total_notional": 475376.119792, "num_positions": 20, "notional_pct_vol": 13.589132487033362, "est_move_pct": 67.94566243516681, "positions": [{"price": 0.8, "notional": 27816.786257, "count": 3}, {"price": 0.9, "notional": 12823.356105, "count": 2}, {"price": 1.0, "notional": 1676.240398, "count": 2}, {"price": 1.1, "notional": 233673.53645200003, "count": 10}, {"price": 1.2, "notional": 192758.22978799997, "count": 1}, {"price": 1.3, "notional": 3041.5241039999996, "count": 1}, {"price": 1.5, "notional": 3586.4466880000004, "count": 1}]}, {"token": "BCH", "vol": 7870549.5, "vol_pct": 42.8, "total_notional": 761032.124788, "num_positions": 31, "notional_pct_vol": 9.669364569627573, "est_move_pct": 48.34682284813787, "positions": [{"price": 140, "notional": 876.5720249999999, "count": 1}, {"price": 220, "notional": 132.992986, "count": 1}, {"price": 230, "notional": 242416.61046, "count": 1}, {"price": 240, "notional": 75877.30691, "count": 4}, {"price": 250, "notional": 14236.263524999998, "count": 4}, {"price": 260, "notional": 206849.32167900002, "count": 3}, {"price": 270, "notional": 91445.775836, "count": 11}, {"price": 290, "notional": 119580.026338, "count": 2}, {"price": 300, "notional": 1146.7535500000001, "count": 2}, {"price": 370, "notional": 8470.501479, "count": 2}]}, {"token": "HBAR", "vol": 9979124.4, "vol_pct": 41.7, "total_notional": 654561.157663, "num_positions": 20, "notional_pct_vol": 6.55930451837037, "est_move_pct": 32.79652259185185, "positions": [{"price": 0.1, "notional": 654561.157663, "count": 20}]}];
 const TOKEN_COLORS = {"BTC": "#f7931a", "ETH": "#627eea", "SOL": "#9945ff", "XRP": "#23292f", "ADA": "#0033ad", "LTC": "#345d9d", "DOGE": "#c2a633", "AVAX": "#e84142", "LINK": "#2a5ada", "SUI": "#4da2ff", "BNB": "#f3ba2f", "HYPE": "#8b5cf6", "DOT": "#e6007a", "XLM": "#7d00ff", "SHIB": "#ffa409", "HBAR": "#00b39f", "BCH": "#8dc351"};
 
 let currentSort = { field: "cc", dir: "desc" };
@@ -221,6 +296,40 @@ function getBarWidth(val, max) {
   return Math.min(100, (val / max) * 100);
 }
 
+function formatPrice(p) {
+  if (p >= 1000) return "$" + p.toLocaleString(undefined, {maximumFractionDigits: 0});
+  if (p >= 1) return "$" + p.toFixed(2);
+  return "$" + p.toFixed(4);
+}
+
+function renderSmallNames() {
+  const container = document.getElementById("small-name-tokens");
+  container.innerHTML = "";
+  
+  for (const item of SMALL_NAME_ANALYSIS) {
+    if (item.notional_pct_vol < 1) continue;
+    
+    const div = document.createElement("div");
+    div.className = "liq-token";
+    
+    let impactClass = "impact-low";
+    if (item.notional_pct_vol > 100) impactClass = "impact-high";
+    else if (item.notional_pct_vol > 20) impactClass = "impact-mid";
+    
+    let html = `<div class="liq-token-name">${item.token}</div>`;
+    html += `<div class="liq-level">Liq: <span class="liq-notional">${formatVol(item.total_notional)}</span> (${item.num_positions} positions)</div>`;
+    html += `<div class="liq-level">Vol 24h: ${formatVol(item.vol)} · <span class="${impactClass}">${item.notional_pct_vol.toFixed(1)}% of vol</span></div>`;
+    
+    if (item.positions.length > 0) {
+      const top = item.positions.sort((a, b) => b.notional - a.notional)[0];
+      html += `<div class="liq-level">Biggest: ${formatPrice(top.price)} (${formatVol(top.notional)})</div>`;
+    }
+    
+    div.innerHTML = html;
+    container.appendChild(div);
+  }
+}
+
 function render() {
   const tbody = document.getElementById("table-body");
   tbody.innerHTML = "";
@@ -240,10 +349,14 @@ function render() {
   const maxCC = Math.max(...rows.map(r => r.cc));
   const maxPK = Math.max(...rows.map(r => r.pk));
   const maxHAR = Math.max(...rows.map(r => r.har));
+  const maxPressure = Math.max(...rows.map(r => r.pressure_score || 0));
 
   rows.forEach(r => {
     const tr = document.createElement("tr");
     const color = TOKEN_COLORS[r.token] || "#666";
+    const pressureClass = "pressure-" + (r.pressure_label || "na");
+    const signalClass = "signal-" + (r.signal || "normal");
+    
     tr.innerHTML = `
       <td>
         <div class="token-cell">
@@ -264,6 +377,12 @@ function render() {
         <span class="vol-bar" style="width:${getBarWidth(r.har, maxHAR) * 0.6}px;background:var(--orange)"></span>
         <span class="${volBadge(r.har)}">${r.har.toFixed(1)}%</span>
       </td>
+      <td>${r.oi_usd ? formatVol(r.oi_usd) : "N/A"}</td>
+      <td>${r.funding_apr ? r.funding_apr.toFixed(1) + "%" : "N/A"}</td>
+      <td>
+        <span class="${pressureClass}">${r.pressure_score || "N/A"}</span>
+        ${r.signal && r.signal !== "normal" ? `<span class="signal-tag ${signalClass}">${r.signal.replace(/_/g, " ")}</span>` : ""}
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -274,6 +393,8 @@ function render() {
       th.querySelector(".arrow").textContent = dir === "asc" ? "↑" : "↓";
     }
   });
+  
+  renderSmallNames();
 }
 
 document.querySelectorAll(".btn-group button").forEach(btn => {
