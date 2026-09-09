@@ -133,6 +133,14 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   padding: 16px;
   margin-bottom: 20px;
 }
+.zones-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.zones-column {
+  flex: 1;
+}
 .zone-card {
   display: inline-block;
   margin-right: 12px;
@@ -141,7 +149,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
   border: 1px solid var(--border);
-  min-width: 180px;
+  min-width: 150px;
 }
 .zone-title {
   font-weight: 600;
@@ -179,7 +187,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 <body>
 
 <h1>Liquidation Price Screener</h1>
-<div class="subtitle">One key liquidation level per token · Sep 09, 2026 18:54 UTC</div>
+<div class="subtitle">One key liquidation level per token · Sep 09, 2026 19:00 UTC</div>
 
 <div class="note">
   <strong>How to read this:</strong> Each row shows the <strong>most dangerous liquidation level</strong> for that token — the price where a cascade would cause the biggest move relative to distance.
@@ -187,14 +195,20 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   <strong>Est. Move</strong> = rough estimate of price impact if cascade triggers. <strong>Levels</strong> = number of positions.
 </div>
 
-<h2>🔥 Danger Zones — Alts</h2>
-<div class="liq-section" id="danger-zones-alts">
-  <div id="zone-cards-alts"></div>
-</div>
-
-<h2>📊 Danger Zones — Majors</h2>
-<div class="liq-section" id="danger-zones-majors">
-  <div id="zone-cards-majors"></div>
+<h2>🔥 Danger Zones</h2>
+<div class="zones-row">
+  <div class="zones-column">
+    <h3>Alts</h3>
+    <div class="liq-section" id="danger-zones-alts">
+      <div id="zone-cards-alts"></div>
+    </div>
+  </div>
+  <div class="zones-column">
+    <h3>Majors</h3>
+    <div class="liq-section" id="danger-zones-majors">
+      <div id="zone-cards-majors"></div>
+    </div>
+  </div>
 </div>
 
 <div class="controls">
@@ -227,13 +241,13 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 </table>
 
 <div class="footer">
-  Data: Hyperliquid wallet positions via public API · Computed: Sep 09, 2026 18:54 UTC<br>
-  189 wallets scanned (64 known + 126 discovered) · 728 positions<br>
+  Data: Hyperliquid wallet positions via public API · Computed: Sep 09, 2026 19:00 UTC<br>
+  175 wallets scanned (64 known + 112 discovered) · 676 positions<br>
   Est. Move uses non-linear model accounting for cascade effects. Not financial advice.
 </div>
 
 <script>
-const ANALYSIS = [{"token": "HYPE", "liq_price": 86, "current_price": 86.02, "distance_pct": -0.02, "abs_distance": 0.02, "notional": 12809437.1115, "cumulative_notional": 12809437.1115, "count": 2, "magnitude_ratio": 1.03, "direction": "DOWN", "est_move_pct": 0.05}, {"token": "ETH", "liq_price": 2500, "current_price": 2485.0, "distance_pct": 0.6, "abs_distance": 0.6, "notional": 811674469.925431, "cumulative_notional": 811674469.925431, "count": 57, "magnitude_ratio": 11.3, "direction": "UP", "est_move_pct": 0.29}, {"token": "BTC", "liq_price": 78500, "current_price": 78470.0, "distance_pct": 0.04, "abs_distance": 0.04, "notional": 31845535.054840006, "cumulative_notional": 31845535.054840006, "count": 5, "magnitude_ratio": 0.09, "direction": "UP", "est_move_pct": 0.04}, {"token": "SUI", "liq_price": 0.8, "current_price": 0.7987, "distance_pct": 0.16, "abs_distance": 0.16, "notional": 2203244.9578, "cumulative_notional": 2203244.9578, "count": 10, "magnitude_ratio": 0.26, "direction": "UP", "est_move_pct": 0.02}, {"token": "BNB", "liq_price": 830, "current_price": 741.2, "distance_pct": 11.98, "abs_distance": 11.98, "notional": 1086225.0, "cumulative_notional": 3723156.954022, "count": 1, "magnitude_ratio": 17.81, "direction": "UP", "est_move_pct": 0.53}, {"token": "SOL", "liq_price": 100, "current_price": 103.25, "distance_pct": -3.15, "abs_distance": 3.15, "notional": 127744248.64369299, "cumulative_notional": 127744248.64369299, "count": 30, "magnitude_ratio": 4.54, "direction": "DOWN", "est_move_pct": 0.14}, {"token": "LINK", "liq_price": 12, "current_price": 11.951, "distance_pct": 0.41, "abs_distance": 0.41, "notional": 4491271.846620999, "cumulative_notional": 4491271.846620999, "count": 9, "magnitude_ratio": 0.56, "direction": "UP", "est_move_pct": 0.03}, {"token": "AVAX", "liq_price": 8.2, "current_price": 7.94, "distance_pct": 3.27, "abs_distance": 3.27, "notional": 2258699.1091480004, "cumulative_notional": 2306204.936608, "count": 1, "magnitude_ratio": 3.29, "direction": "UP", "est_move_pct": 0.12}, {"token": "DOGE", "liq_price": 0.1, "current_price": 0.08879, "distance_pct": 12.63, "abs_distance": 12.63, "notional": 25799318.68561099, "cumulative_notional": 25799318.68561099, "count": 42, "magnitude_ratio": 5.09, "direction": "UP", "est_move_pct": 0.16}, {"token": "LTC", "liq_price": 58, "current_price": 54.1, "distance_pct": 7.21, "abs_distance": 7.21, "notional": 1970591.6784939996, "cumulative_notional": 2216035.1500449996, "count": 16, "magnitude_ratio": 1.54, "direction": "UP", "est_move_pct": 0.07}, {"token": "XRP", "liq_price": 1.4, "current_price": 1.4189, "distance_pct": -1.33, "abs_distance": 1.33, "notional": 13883073.431785, "cumulative_notional": 13883073.431785, "count": 21, "magnitude_ratio": 0.23, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "SHIB", "liq_price": 0.0, "current_price": 0.00537, "distance_pct": -100.0, "abs_distance": 100.0, "notional": 756307.9829899999, "cumulative_notional": 756307.9829899999, "count": 21, "magnitude_ratio": 6.33, "direction": "DOWN", "est_move_pct": 0.18}, {"token": "XLM", "liq_price": 0.2, "current_price": 0.18475, "distance_pct": 8.25, "abs_distance": 8.25, "notional": 2641383.2428140007, "cumulative_notional": 2641383.2428140007, "count": 30, "magnitude_ratio": 0.32, "direction": "UP", "est_move_pct": 0.02}, {"token": "ADA", "liq_price": 0.2, "current_price": 0.217, "distance_pct": -7.83, "abs_distance": 7.83, "notional": 1469724.5787730003, "cumulative_notional": 1469724.5787730003, "count": 31, "magnitude_ratio": 0.23, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "DOT", "liq_price": 1.4, "current_price": 1.125, "distance_pct": 24.44, "abs_distance": 24.44, "notional": 957383.6922599999, "cumulative_notional": 1355382.378004, "count": 1, "magnitude_ratio": 0.47, "direction": "UP", "est_move_pct": 0.03}, {"token": "BCH", "liq_price": 280, "current_price": 257.9, "distance_pct": 8.57, "abs_distance": 8.57, "notional": 453011.040611, "cumulative_notional": 839380.135244, "count": 12, "magnitude_ratio": 0.11, "direction": "UP", "est_move_pct": 0.01}, {"token": "HBAR", "liq_price": 0.1, "current_price": 0.07798, "distance_pct": 28.24, "abs_distance": 28.24, "notional": 552087.911632, "cumulative_notional": 552087.911632, "count": 24, "magnitude_ratio": 0.06, "direction": "UP", "est_move_pct": 0.03}];
+const ANALYSIS = [{"token": "HYPE", "liq_price": 86, "current_price": 86.02, "distance_pct": -0.02, "abs_distance": 0.02, "notional": 12810213.925279, "cumulative_notional": 12810213.925279, "count": 3, "magnitude_ratio": 1.03, "direction": "DOWN", "est_move_pct": 0.05}, {"token": "ETH", "liq_price": 2500, "current_price": 2481.5, "distance_pct": 0.75, "abs_distance": 0.75, "notional": 787873844.8043059, "cumulative_notional": 787873844.8043059, "count": 49, "magnitude_ratio": 11.03, "direction": "UP", "est_move_pct": 0.28}, {"token": "SUI", "liq_price": 0.8, "current_price": 0.7998, "distance_pct": 0.03, "abs_distance": 0.03, "notional": 2216811.044389, "cumulative_notional": 2216811.044389, "count": 8, "magnitude_ratio": 0.26, "direction": "UP", "est_move_pct": 0.02}, {"token": "SOL", "liq_price": 100, "current_price": 103.33, "distance_pct": -3.22, "abs_distance": 3.22, "notional": 121761327.54249601, "cumulative_notional": 121761327.54249601, "count": 27, "magnitude_ratio": 4.34, "direction": "DOWN", "est_move_pct": 0.14}, {"token": "BNB", "liq_price": 700, "current_price": 740.65, "distance_pct": -5.49, "abs_distance": 5.49, "notional": 1268697.3709880002, "cumulative_notional": 1335433.306487, "count": 3, "magnitude_ratio": 6.39, "direction": "DOWN", "est_move_pct": 0.18}, {"token": "LINK", "liq_price": 12, "current_price": 11.933, "distance_pct": 0.56, "abs_distance": 0.56, "notional": 3932016.75314, "cumulative_notional": 3932016.75314, "count": 8, "magnitude_ratio": 0.49, "direction": "UP", "est_move_pct": 0.03}, {"token": "BTC", "liq_price": 78500, "current_price": 78400.0, "distance_pct": 0.13, "abs_distance": 0.13, "notional": 34083279.66976601, "cumulative_notional": 34083279.66976601, "count": 5, "magnitude_ratio": 0.1, "direction": "UP", "est_move_pct": 0.05}, {"token": "DOGE", "liq_price": 0.1, "current_price": 0.08867, "distance_pct": 12.78, "abs_distance": 12.78, "notional": 17799086.029303, "cumulative_notional": 17799086.029303, "count": 40, "magnitude_ratio": 3.53, "direction": "UP", "est_move_pct": 0.12}, {"token": "XRP", "liq_price": 1.4, "current_price": 1.4189, "distance_pct": -1.33, "abs_distance": 1.33, "notional": 19408299.849068, "cumulative_notional": 19408299.849068, "count": 27, "magnitude_ratio": 0.32, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "AVAX", "liq_price": 8.4, "current_price": 7.94, "distance_pct": 5.79, "abs_distance": 5.79, "notional": 625883.3393690002, "cumulative_notional": 929123.5737690001, "count": 4, "magnitude_ratio": 1.33, "direction": "UP", "est_move_pct": 0.06}, {"token": "LTC", "liq_price": 58, "current_price": 54.15, "distance_pct": 7.11, "abs_distance": 7.11, "notional": 1953452.2872029997, "cumulative_notional": 2192094.3535929997, "count": 13, "magnitude_ratio": 1.53, "direction": "UP", "est_move_pct": 0.07}, {"token": "SHIB", "liq_price": 0.0, "current_price": 0.00537, "distance_pct": -100.0, "abs_distance": 100.0, "notional": 776931.0804399999, "cumulative_notional": 776931.0804399999, "count": 17, "magnitude_ratio": 6.5, "direction": "DOWN", "est_move_pct": 0.19}, {"token": "ADA", "liq_price": 0.2, "current_price": 0.217, "distance_pct": -7.83, "abs_distance": 7.83, "notional": 1779425.740663, "cumulative_notional": 1779425.740663, "count": 26, "magnitude_ratio": 0.28, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "XLM", "liq_price": 0.2, "current_price": 0.18486, "distance_pct": 8.19, "abs_distance": 8.19, "notional": 2260242.701477, "cumulative_notional": 2260242.701477, "count": 25, "magnitude_ratio": 0.28, "direction": "UP", "est_move_pct": 0.02}, {"token": "DOT", "liq_price": 1.4, "current_price": 1.124, "distance_pct": 24.56, "abs_distance": 24.56, "notional": 957383.6922599999, "cumulative_notional": 1369000.8735, "count": 1, "magnitude_ratio": 0.47, "direction": "UP", "est_move_pct": 0.03}, {"token": "HBAR", "liq_price": 0.1, "current_price": 0.07813, "distance_pct": 27.99, "abs_distance": 27.99, "notional": 436985.667213, "cumulative_notional": 436985.667213, "count": 16, "magnitude_ratio": 0.05, "direction": "UP", "est_move_pct": 0.02}, {"token": "BCH", "liq_price": 260, "current_price": 257.55, "distance_pct": 0.95, "abs_distance": 0.95, "notional": 38012.227088, "cumulative_notional": 38012.227088, "count": 1, "magnitude_ratio": 0.0, "direction": "UP", "est_move_pct": 0.0}];
 const TOKEN_COLORS = {"BTC": "#f7931a", "ETH": "#627eea", "SOL": "#9945ff", "XRP": "#23292f", "ADA": "#0033ad", "LTC": "#345d9d", "DOGE": "#c2a633", "AVAX": "#e84142", "LINK": "#2a5ada", "SUI": "#4da2ff", "BNB": "#f3ba2f", "HYPE": "#8b5cf6", "DOT": "#e6007a", "XLM": "#7d00ff", "SHIB": "#ffa409", "HBAR": "#00b39f", "BCH": "#8dc351"};
 const DANGER_ZONES_ALTS = {"within_1pct": {"count": 0, "total_value": 0.0, "tokens": 0}, "within_2pct": {"count": 0, "total_value": 0.0, "tokens": 0}, "within_5pct": {"count": 0, "total_value": 0.0, "tokens": 0}};
 const DANGER_ZONES_MAJORS = {"within_1pct": {"count": 0, "total_value": 0.0, "tokens": 0}, "within_2pct": {"count": 0, "total_value": 0.0, "tokens": 0}, "within_5pct": {"count": 0, "total_value": 0.0, "tokens": 0}};
