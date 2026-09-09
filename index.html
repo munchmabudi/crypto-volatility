@@ -3,216 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Liquidation Price Screener</title>
+<title>Crypto Volatility + Liquidation Dashboard</title>
 <style>
 :root {
-  --bg: #0f1117;
-  --card: #1a1d27;
-  --border: #2a2d3a;
-  --text: #e1e4ed;
-  --muted: #8b8fa3;
-  --accent: #4f8cff;
-  --green: #26c281;
-  --orange: #f5a623;
-  --red: #e0556a;
-  --purple: #a78bfa;
+  --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a;
+  --text: #e1e4ed; --muted: #8b8fa3; --accent: #4f8cff;
+  --green: #26c281; --orange: #f5a623; --red: #e0556a; --purple: #a78bfa;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  padding: 24px;
-  min-height: 100vh;
-}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
 h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+h2 { font-size: 1.1rem; font-weight: 600; margin: 20px 0 10px 0; }
 .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
-.controls {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.btn-group {
-  display: flex;
-  gap: 4px;
-  background: var(--card);
-  border-radius: 8px;
-  padding: 3px;
-  border: 1px solid var(--border);
-}
-.btn-group-label {
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 6px 8px 6px 12px;
-  align-self: center;
-}
-button {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  transition: all 0.15s;
-}
+.controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.btn-group { display: flex; gap: 4px; background: var(--card); border-radius: 8px; padding: 3px; border: 1px solid var(--border); }
+.btn-group-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px 6px 12px; align-self: center; }
+button { background: transparent; border: none; color: var(--muted); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.15s; }
 button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
 button.active { background: var(--accent); color: white; }
-.filter-box {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  width: 180px;
-}
+.filter-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 0.8rem; width: 180px; }
 .filter-box:focus { outline: none; border-color: var(--accent); }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--card);
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 20px; }
 thead { background: #1f2330; }
-th {
-  padding: 12px 16px;
-  text-align: right;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  transition: color 0.15s;
-}
+th { padding: 12px 16px; text-align: right; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.15s; }
 th:first-child { text-align: left; }
 th:hover { color: var(--text); }
 th .arrow { margin-left: 4px; font-size: 0.7rem; }
-td {
-  padding: 12px 16px;
-  text-align: right;
-  font-size: 0.9rem;
-  border-top: 1px solid var(--border);
-  font-variant-numeric: tabular-nums;
-}
+td { padding: 12px 16px; text-align: right; font-size: 0.9rem; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 td:first-child { text-align: left; font-weight: 600; font-size: 0.95rem; }
 tr:hover td { background: rgba(255,255,255,0.02); }
 .token-cell { display: flex; align-items: center; gap: 10px; }
-.token-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
-}
+.token-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: white; flex-shrink: 0; }
 .distance-near { color: var(--red); font-weight: 600; }
 .distance-mid { color: var(--orange); }
 .distance-far { color: var(--green); }
 .magnitude-high { color: var(--red); font-weight: 600; }
 .magnitude-mid { color: var(--orange); }
 .magnitude-low { color: var(--muted); }
-.liq-section {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-.zones-row {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.zones-column {
-  flex: 1;
-}
-.zone-card {
-  display: inline-block;
-  margin-right: 8px;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  min-width: 120px;
-  font-size: 0.75rem;
-}
-.zone-title {
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 4px;
-}
-.zone-value {
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 2px;
-}
-.zone-highlight {
-  color: var(--orange);
-  font-weight: 500;
-}
-.footer {
-  margin-top: 20px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-.note {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
+.liq-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+.zone-card { display: inline-block; margin-right: 8px; margin-bottom: 8px; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border); min-width: 120px; font-size: 0.75rem; }
+.zone-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+.zone-value { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+.zone-highlight { color: var(--orange); font-weight: 500; }
+.footer { margin-top: 20px; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.note { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
 .note strong { color: var(--text); }
+.vol-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.vol-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.vol-card-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; }
+.vol-card-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+.vol-card-value { color: var(--text); font-weight: 500; }
 </style>
 </head>
 <body>
-
-<h1>Liquidation Price Screener</h1>
-<div class="subtitle">One key liquidation level per token · Sep 09, 2026 20:20 UTC</div>
-
+<h1>Crypto Volatility + Liquidation Dashboard</h1>
+<div class="subtitle">Sep 09, 2026 20:45 UTC</div>
 <div class="note">
-  <strong>How to read this:</strong> Each row shows the <strong>most dangerous liquidation level</strong> for that token — the price where a cascade would cause the biggest move relative to distance.
-  <strong>Distance</strong> = how far price needs to move (in %). <strong>Magnitude</strong> = cumulative liquidation notional as multiple of daily volume.
-  <strong>Est. Move</strong> = rough estimate of price impact if cascade triggers. <strong>Levels</strong> = number of positions.
-  <strong>Danger Zones</strong> show positions within 1%/2%/5% of liquidation. If all are 0, no positions are currently in immediate danger.
+  <strong>Distance (%)</strong> = (liq_price - current_price) / current_price × 100. + means liquidation is above current price (cascade up), - means below (cascade down).<br>
+  <strong>CC</strong> = Close-to-Close realized vol (7d, annualized). <strong>PK</strong> = Parkinson vol (uses high/low). <strong>HAR</short> = HAR-RV forecast.<br>
+  <strong>Magnitude</strong> = cumulative liquidation notional / daily volume. <strong>Est. Move</strong> = rough price impact estimate.
 </div>
-
+<h2>📈 Volatility (7-Day Realized + Forecast)</h2>
+<div class="vol-grid" id="vol-grid"></div>
 <h2>🔥 Danger Zones</h2>
-<div class="zones-row">
-  <div class="zones-column">
-    <h3>Alts</h3>
-    <div class="liq-section" id="danger-zones-alts">
+<div class="liq-section">
+  <div style="display: flex; gap: 20px;">
+    <div style="flex: 1;">
+      <h3>Alts</h3>
       <div id="zone-cards-alts"></div>
     </div>
-  </div>
-  <div class="zones-column">
-    <h3>Majors</h3>
-    <div class="liq-section" id="danger-zones-majors">
+    <div style="flex: 1;">
+      <h3>Majors</h3>
       <div id="zone-cards-majors"></div>
     </div>
   </div>
 </div>
-
+<h2>📊 Liquidation Price Levels</h2>
 <div class="controls">
   <div class="btn-group">
     <span class="btn-group-label">Sort by</span>
@@ -224,7 +90,6 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   </div>
   <input type="text" class="filter-box" placeholder="Filter tokens..." id="filter">
 </div>
-
 <table>
   <thead>
     <tr>
@@ -241,59 +106,69 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   </thead>
   <tbody id="table-body"></tbody>
 </table>
-
 <div class="footer">
-  Data: Hyperliquid wallet positions via public API · Computed: Sep 09, 2026 20:20 UTC<br>
-  188 wallets scanned (64 known + 126 discovered) · 770 positions<br>
-  Est. Move uses non-linear model accounting for cascade effects. Not financial advice.
+  Data: Coinbase (prices, volume, vol) + Hyperliquid (liquidations) · Computed: Sep 09, 2026 20:45 UTC<br>
+  188 wallets scanned (64 known + 125 discovered) · 734 positions<br>
+  Est. Move uses non-linear model. Not financial advice.
 </div>
-
 <script>
-const ANALYSIS = [{"token": "SOL", "liq_price": 101, "current_price": 102.29, "distance_pct": -1.26, "abs_distance": 1.26, "notional": 74665211.98146199, "cumulative_notional": 74799852.90771198, "count": 15, "magnitude_ratio": 2.82, "direction": "DOWN", "est_move_pct": 0.1}, {"token": "BNB", "liq_price": 591, "current_price": 736.4, "distance_pct": -19.74, "abs_distance": 19.74, "notional": 788659.70658, "cumulative_notional": 6965256.106721, "count": 1, "magnitude_ratio": 32.84, "direction": "DOWN", "est_move_pct": 1.18}, {"token": "HYPE", "liq_price": 85.6, "current_price": 84.98, "distance_pct": 0.73, "abs_distance": 0.73, "notional": 12000810.0, "cumulative_notional": 12000810.0, "count": 1, "magnitude_ratio": 1.06, "direction": "UP", "est_move_pct": 0.05}, {"token": "ETH", "liq_price": 2520, "current_price": 2469.5, "distance_pct": 2.04, "abs_distance": 2.04, "notional": 124973315.61798002, "cumulative_notional": 187081004.17074502, "count": 4, "magnitude_ratio": 2.15, "direction": "UP", "est_move_pct": 0.09}, {"token": "BTC", "liq_price": 77920, "current_price": 78265.0, "distance_pct": -0.44, "abs_distance": 0.44, "notional": 10910152.381008, "cumulative_notional": 100041908.92614, "count": 1, "magnitude_ratio": 0.29, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "DOGE", "liq_price": 0.09, "current_price": 0.08673, "distance_pct": 3.77, "abs_distance": 3.77, "notional": 11391185.142496, "cumulative_notional": 11391185.142496, "count": 15, "magnitude_ratio": 2.23, "direction": "UP", "est_move_pct": 0.09}, {"token": "LTC", "liq_price": 52.4, "current_price": 53.73, "distance_pct": -2.48, "abs_distance": 2.48, "notional": 984460.260117, "cumulative_notional": 1038997.1281259999, "count": 1, "magnitude_ratio": 0.74, "direction": "DOWN", "est_move_pct": 0.04}, {"token": "XRP", "liq_price": 1.41, "current_price": 1.4019, "distance_pct": 0.58, "abs_distance": 0.58, "notional": 5247368.176785001, "cumulative_notional": 5247368.176785001, "count": 1, "magnitude_ratio": 0.09, "direction": "UP", "est_move_pct": 0.05}, {"token": "AVAX", "liq_price": 8.49, "current_price": 7.88, "distance_pct": 7.74, "abs_distance": 7.74, "notional": 108974.39642700001, "cumulative_notional": 522048.00642600004, "count": 1, "magnitude_ratio": 0.81, "direction": "UP", "est_move_pct": 0.04}, {"token": "SUI", "liq_price": 0.77, "current_price": 0.7868, "distance_pct": -2.14, "abs_distance": 2.14, "notional": 1289169.6341849999, "cumulative_notional": 1289169.6341849999, "count": 1, "magnitude_ratio": 0.16, "direction": "DOWN", "est_move_pct": 0.01}, {"token": "LINK", "liq_price": 10.7, "current_price": 11.852, "distance_pct": -9.72, "abs_distance": 9.72, "notional": 398734.125192, "cumulative_notional": 4235073.397286999, "count": 1, "magnitude_ratio": 0.54, "direction": "DOWN", "est_move_pct": 0.03}, {"token": "DOT", "liq_price": 1.13, "current_price": 1.118, "distance_pct": 1.07, "abs_distance": 1.07, "notional": 63412.313553, "cumulative_notional": 63412.313553, "count": 1, "magnitude_ratio": 0.03, "direction": "UP", "est_move_pct": 0.01}, {"token": "SHIB", "liq_price": 0.01, "current_price": 0.00529, "distance_pct": 89.04, "abs_distance": 89.04, "notional": 164943.51795399998, "cumulative_notional": 164943.51795399998, "count": 14, "magnitude_ratio": 1.27, "direction": "UP", "est_move_pct": 0.06}, {"token": "ADA", "liq_price": 0.18, "current_price": 0.2146, "distance_pct": -16.12, "abs_distance": 16.12, "notional": 1079333.225565, "cumulative_notional": 1238274.058244, "count": 6, "magnitude_ratio": 0.2, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "HBAR", "liq_price": 0.08, "current_price": 0.07754, "distance_pct": 3.17, "abs_distance": 3.17, "notional": 218637.994041, "cumulative_notional": 218637.994041, "count": 4, "magnitude_ratio": 0.02, "direction": "UP", "est_move_pct": 0.01}, {"token": "XLM", "liq_price": 0.22, "current_price": 0.18244, "distance_pct": 20.59, "abs_distance": 20.59, "notional": 627282.7919089999, "cumulative_notional": 986507.7262729998, "count": 8, "magnitude_ratio": 0.12, "direction": "UP", "est_move_pct": 0.01}, {"token": "BCH", "liq_price": 265, "current_price": 255.35, "distance_pct": 3.78, "abs_distance": 3.78, "notional": 139649.272928, "cumulative_notional": 176785.292849, "count": 1, "magnitude_ratio": 0.02, "direction": "UP", "est_move_pct": 0.01}];
+const ANALYSIS = [{"token": "SOL", "liq_price": 101, "current_price": 102.48, "distance_pct": -1.44, "abs_distance": 1.44, "notional": 74664835.683808, "cumulative_notional": 74664835.683808, "count": 10, "magnitude_ratio": 2.84, "direction": "DOWN", "est_move_pct": 0.1}, {"token": "HYPE", "liq_price": 85.9, "current_price": 85.0, "distance_pct": 1.06, "abs_distance": 1.06, "notional": 9512249.747943, "cumulative_notional": 21513356.621772, "count": 1, "magnitude_ratio": 1.86, "direction": "UP", "est_move_pct": 0.08}, {"token": "BNB", "liq_price": 728, "current_price": 735.5, "distance_pct": -1.02, "abs_distance": 1.02, "notional": 341091.046251, "cumulative_notional": 401882.54682600003, "count": 1, "magnitude_ratio": 1.51, "direction": "DOWN", "est_move_pct": 0.07}, {"token": "ETH", "liq_price": 2440, "current_price": 2468.0, "distance_pct": -1.13, "abs_distance": 1.13, "notional": 99211649.64077301, "cumulative_notional": 101864988.20348102, "count": 7, "magnitude_ratio": 1.18, "direction": "DOWN", "est_move_pct": 0.06}, {"token": "BTC", "liq_price": 77920, "current_price": 78260.0, "distance_pct": -0.43, "abs_distance": 0.43, "notional": 10910152.381008, "cumulative_notional": 99758118.72960898, "count": 1, "magnitude_ratio": 0.29, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "DOGE", "liq_price": 0.09, "current_price": 0.08678, "distance_pct": 3.71, "abs_distance": 3.71, "notional": 10676604.333557002, "cumulative_notional": 10676604.333557002, "count": 13, "magnitude_ratio": 2.01, "direction": "UP", "est_move_pct": 0.08}, {"token": "LTC", "liq_price": 52.4, "current_price": 53.57, "distance_pct": -2.18, "abs_distance": 2.18, "notional": 973989.4633859999, "cumulative_notional": 1028482.8807099999, "count": 1, "magnitude_ratio": 0.73, "direction": "DOWN", "est_move_pct": 0.04}, {"token": "DOT", "liq_price": 1.12, "current_price": 1.116, "distance_pct": 0.36, "abs_distance": 0.36, "notional": 140009.592853, "cumulative_notional": 140009.592853, "count": 1, "magnitude_ratio": 0.06, "direction": "UP", "est_move_pct": 0.03}, {"token": "XRP", "liq_price": 1.41, "current_price": 1.4012, "distance_pct": 0.63, "abs_distance": 0.63, "notional": 5290028.344074, "cumulative_notional": 5290028.344074, "count": 2, "magnitude_ratio": 0.09, "direction": "UP", "est_move_pct": 0.05}, {"token": "AVAX", "liq_price": 8.48, "current_price": 7.87, "distance_pct": 7.75, "abs_distance": 7.75, "notional": 105349.662852, "cumulative_notional": 553176.546713, "count": 1, "magnitude_ratio": 0.85, "direction": "UP", "est_move_pct": 0.04}, {"token": "SUI", "liq_price": 0.77, "current_price": 0.7848, "distance_pct": -1.89, "abs_distance": 1.89, "notional": 1289169.6341849999, "cumulative_notional": 1307535.4211849999, "count": 1, "magnitude_ratio": 0.16, "direction": "DOWN", "est_move_pct": 0.01}, {"token": "LINK", "liq_price": 10.7, "current_price": 11.797, "distance_pct": -9.3, "abs_distance": 9.3, "notional": 405200.79662800004, "cumulative_notional": 4221073.403328, "count": 1, "magnitude_ratio": 0.54, "direction": "DOWN", "est_move_pct": 0.03}, {"token": "BCH", "liq_price": 253, "current_price": 254.8, "distance_pct": -0.71, "abs_distance": 0.71, "notional": 38014.549307, "cumulative_notional": 38014.549307, "count": 1, "magnitude_ratio": 0.01, "direction": "DOWN", "est_move_pct": 0.0}, {"token": "SHIB", "liq_price": 0.01, "current_price": 0.00528, "distance_pct": 89.39, "abs_distance": 89.39, "notional": 172853.679755, "cumulative_notional": 172853.679755, "count": 18, "magnitude_ratio": 1.21, "direction": "UP", "est_move_pct": 0.06}, {"token": "ADA", "liq_price": 0.18, "current_price": 0.2138, "distance_pct": -15.81, "abs_distance": 15.81, "notional": 1052281.907983, "cumulative_notional": 1198372.8631769998, "count": 8, "magnitude_ratio": 0.19, "direction": "DOWN", "est_move_pct": 0.02}, {"token": "HBAR", "liq_price": 0.08, "current_price": 0.07716, "distance_pct": 3.68, "abs_distance": 3.68, "notional": 217400.02090599996, "cumulative_notional": 217400.02090599996, "count": 3, "magnitude_ratio": 0.02, "direction": "UP", "est_move_pct": 0.01}, {"token": "XLM", "liq_price": 0.22, "current_price": 0.18265, "distance_pct": 20.45, "abs_distance": 20.45, "notional": 526042.081222, "cumulative_notional": 886424.5943119999, "count": 7, "magnitude_ratio": 0.11, "direction": "UP", "est_move_pct": 0.01}];
 const TOKEN_COLORS = {"BTC": "#f7931a", "ETH": "#627eea", "SOL": "#9945ff", "XRP": "#23292f", "ADA": "#0033ad", "LTC": "#345d9d", "DOGE": "#c2a633", "AVAX": "#e84142", "LINK": "#2a5ada", "SUI": "#4da2ff", "BNB": "#f3ba2f", "HYPE": "#8b5cf6", "DOT": "#e6007a", "XLM": "#7d00ff", "SHIB": "#ffa409", "HBAR": "#00b39f", "BCH": "#8dc351"};
-const DANGER_ZONES_ALTS = {"within_1pct": {"tokens": ["BNB", "LTC", "SHIB", "HYPE", "DOGE", "DOT"], "total_value": 12718626.603761, "count": 6}, "within_2pct": {"tokens": ["AVAX", "BNB", "LTC", "SHIB", "HYPE", "DOGE", "DOT"], "total_value": 12759336.972911, "count": 7}, "within_5pct": {"tokens": ["AVAX", "BNB", "LTC", "SHIB", "HYPE", "DOGE", "SUI", "DOT"], "total_value": 14048506.607096, "count": 8}};
-const DANGER_ZONES_MAJORS = {"within_1pct": {"tokens": ["BTC", "ETH", "XRP"], "total_value": 39358847.932901, "count": 3}, "within_2pct": {"tokens": ["BTC", "ETH", "SOL", "XRP"], "total_value": 112626374.08521101, "count": 4}, "within_5pct": {"tokens": ["BTC", "ETH", "SOL", "XRP"], "total_value": 112626374.08521101, "count": 4}};
-
+const DANGER_ZONES_ALTS = {"within_1pct": {"tokens": ["BNB", "SHIB", "HYPE", "LTC", "DOGE", "DOT"], "count": 6}, "within_2pct": {"tokens": ["BNB", "SHIB", "HYPE", "AVAX", "LTC", "DOGE", "DOT"], "count": 7}, "within_5pct": {"tokens": ["BNB", "SHIB", "HYPE", "AVAX", "LTC", "DOGE", "SUI", "DOT"], "count": 8}};
+const DANGER_ZONES_MAJORS = {"within_1pct": {"tokens": ["BTC", "ETH", "XRP"], "count": 3}, "within_2pct": {"tokens": ["BTC", "ETH", "SOL", "XRP"], "count": 4}, "within_5pct": {"tokens": ["BTC", "ETH", "SOL", "XRP"], "count": 4}};
+const VOLATILITY = {"BTC": {"cc_vol": 41.92, "pk_vol": 38.88, "har_forecast": 35.09}, "ETH": {"cc_vol": 40.35, "pk_vol": 43.11, "har_forecast": 47.08}, "SOL": {"cc_vol": 42.92, "pk_vol": 47.48, "har_forecast": 50.71}, "XRP": {"cc_vol": 62.69, "pk_vol": 62.13, "har_forecast": 60.81}, "ADA": {"cc_vol": 85.97, "pk_vol": 87.56, "har_forecast": 70.57}, "LTC": {"cc_vol": 62.41, "pk_vol": 66.4, "har_forecast": 61.24}, "DOGE": {"cc_vol": 76.54, "pk_vol": 82.11, "har_forecast": 70.88}, "AVAX": {"cc_vol": 48.66, "pk_vol": 52.85, "har_forecast": 49.94}, "LINK": {"cc_vol": 102.77, "pk_vol": 83.78, "har_forecast": 95.78}, "SUI": {"cc_vol": 63.38, "pk_vol": 84.85, "har_forecast": 68.54}, "BNB": {"cc_vol": 65.35, "pk_vol": 44.75, "har_forecast": 56.57}, "HYPE": {"cc_vol": 63.79, "pk_vol": 59.65, "har_forecast": 65.97}, "DOT": {"cc_vol": 148.86, "pk_vol": 129.56, "har_forecast": 137.11}, "XLM": {"cc_vol": 60.64, "pk_vol": 67.35, "har_forecast": 62.39}, "SHIB": {"cc_vol": 50.67, "pk_vol": 52.9, "har_forecast": 63.16}, "HBAR": {"cc_vol": 59.58, "pk_vol": 56.24, "har_forecast": 51.42}, "BCH": {"cc_vol": 50.32, "pk_vol": 64.64, "har_forecast": 67.7}};
+const VOLUMES = {"BTC": 344833467.75, "ETH": 86435283.2, "BCH": 7590746.8, "SOL": 26277899.4, "HYPE": 11568500.0, "LTC": 1409694.55, "BNB": 266251.0, "LINK": 7857391.85, "XRP": 57496633.95, "AVAX": 651163.8, "DOT": 2182449.6, "SUI": 8216463.6, "ADA": 6444098.4, "HBAR": 9435510.6, "XLM": 8117879.25, "DOGE": 5303125.8, "SHIB": 142718.4};
 let currentSort = { field: "abs_distance", dir: "asc" };
 let filterText = "";
-
 function formatVol(v) {
   if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
   return v.toFixed(0);
 }
-
 function formatPrice(p) {
   if (p >= 1000) return "$" + p.toLocaleString(undefined, {maximumFractionDigits: 0});
   if (p >= 1) return "$" + p.toFixed(2);
   return "$" + p.toFixed(4);
 }
-
 function distanceClass(d) {
   if (d < 2) return "distance-near";
   if (d < 10) return "distance-mid";
   return "distance-far";
 }
-
 function magnitudeClass(m) {
   if (m > 50) return "magnitude-high";
   if (m > 10) return "magnitude-mid";
   return "magnitude-low";
 }
-
+function renderVolatility() {
+  const grid = document.getElementById("vol-grid");
+  grid.innerHTML = "";
+  for (const [token, vol] of Object.entries(VOLATILITY)) {
+    const color = TOKEN_COLORS[token] || "#666";
+    const volume = VOLUMES[token] || 0;
+    const div = document.createElement("div");
+    div.className = "vol-card";
+    div.innerHTML = `
+      <div class="vol-card-title"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;"></span>${token}</div>
+      <div class="vol-card-row"><span>CC Vol</span><span class="vol-card-value">${vol.cc_vol}%</span></div>
+      <div class="vol-card-row"><span>PK Vol</span><span class="vol-card-value">${vol.pk_vol}%</span></div>
+      <div class="vol-card-row"><span>HAR Forecast</span><span class="vol-card-value">${vol.har_forecast}%</span></div>
+      <div class="vol-card-row"><span>24h Volume</span><span class="vol-card-value">${formatVol(volume)}</span></div>
+    `;
+    grid.appendChild(div);
+  }
+}
 function renderDangerZones() {
   const containerAlts = document.getElementById("zone-cards-alts");
   const containerMajors = document.getElementById("zone-cards-majors");
   containerAlts.innerHTML = "";
   containerMajors.innerHTML = "";
-  
   const zones = [
     { key: "within_1pct", label: "🔥 Within 1%", color: "var(--red)" },
     { key: "within_2pct", label: "⚠️ Within 2%", color: "var(--orange)" },
     { key: "within_5pct", label: "📍 Within 5%", color: "var(--green)" },
   ];
-  
   for (const zone of zones) {
     const dataAlts = DANGER_ZONES_ALTS[zone.key];
     const divAlts = document.createElement("div");
@@ -304,7 +179,6 @@ function renderDangerZones() {
       <div class="zone-value">${dataAlts.tokens.join(", ") || "None"}</div>
     `;
     containerAlts.appendChild(divAlts);
-    
     const dataMajors = DANGER_ZONES_MAJORS[zone.key];
     const divMajors = document.createElement("div");
     divMajors.className = "zone-card";
@@ -316,37 +190,26 @@ function renderDangerZones() {
     containerMajors.appendChild(divMajors);
   }
 }
-
 function render() {
   const tbody = document.getElementById("table-body");
   tbody.innerHTML = "";
-
   let rows = ANALYSIS.filter(d => d.token.toLowerCase().includes(filterText.toLowerCase()));
-
   const { field, dir } = currentSort;
   rows.sort((a, b) => {
     let va, vb;
     if (field === "token" || field === "direction") {
       return dir === "asc" ? a.token.localeCompare(b.token) : b.token.localeCompare(a.token);
     }
-    va = a[field];
-    vb = b[field];
+    va = a[field]; vb = b[field];
     return dir === "asc" ? va - vb : vb - va;
   });
-
   rows.forEach(r => {
     const tr = document.createElement("tr");
     const color = TOKEN_COLORS[r.token] || "#666";
     const distClass = distanceClass(r.abs_distance);
     const magClass = magnitudeClass(r.magnitude_ratio);
-    
     tr.innerHTML = `
-      <td>
-        <div class="token-cell">
-          <div class="token-icon" style="background:${color}">${r.token.slice(0,2)}</div>
-          ${r.token}
-        </div>
-      </td>
+      <td><div class="token-cell"><div class="token-icon" style="background:${color}">${r.token.slice(0,2)}</div>${r.token}</div></td>
       <td><strong>${formatPrice(r.liq_price)}</strong></td>
       <td>${formatPrice(r.current_price)}</td>
       <td class="${distClass}">${r.distance_pct > 0 ? "+" : ""}${r.distance_pct.toFixed(2)}%</td>
@@ -358,17 +221,14 @@ function render() {
     `;
     tbody.appendChild(tr);
   });
-
   document.querySelectorAll("th").forEach(th => {
     th.querySelector(".arrow").textContent = "";
     if (th.dataset.sort === field) {
       th.querySelector(".arrow").textContent = dir === "asc" ? "↑" : "↓";
     }
   });
-  
   renderDangerZones();
 }
-
 document.querySelectorAll(".btn-group button").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".btn-group button").forEach(b => b.classList.remove("active"));
@@ -377,7 +237,6 @@ document.querySelectorAll(".btn-group button").forEach(btn => {
     render();
   });
 });
-
 document.querySelectorAll("th").forEach(th => {
   th.addEventListener("click", () => {
     const field = th.dataset.sort;
@@ -392,12 +251,11 @@ document.querySelectorAll("th").forEach(th => {
     render();
   });
 });
-
 document.getElementById("filter").addEventListener("input", (e) => {
   filterText = e.target.value;
   render();
 });
-
+renderVolatility();
 render();
 </script>
 </body>
