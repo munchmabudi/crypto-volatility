@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Realized Volatility — 7-Day + HAR-RV Forecast</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --border: #2a2d3a;
+  --text: #e1e4ed;
+  --muted: #8b8fa3;
+  --accent: #4f8cff;
+  --green: #26c281;
+  --orange: #f5a623;
+  --red: #e0556a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 24px;
+  min-height: 100vh;
+}
+h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
+.subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn-group {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border-radius: 8px;
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+.btn-group-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 8px 6px 12px;
+  align-self: center;
+}
+button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+button.active { background: var(--accent); color: white; }
+.filter-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  width: 180px;
+}
+.filter-box:focus { outline: none; border-color: var(--accent); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+thead { background: #1f2330; }
+th {
+  padding: 12px 16px;
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+th:first-child { text-align: left; }
+th:hover { color: var(--text); }
+th .arrow { margin-left: 4px; font-size: 0.7rem; }
+td {
+  padding: 12px 16px;
+  text-align: right;
+  font-size: 0.9rem;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+td:first-child { text-align: left; font-weight: 600; font-size: 0.95rem; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.vol-bar {
+  display: inline-block;
+  height: 4px;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.token-cell { display: flex; align-items: center; gap: 10px; }
+.token-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+.badge-low { color: var(--green); }
+.badge-mid { color: var(--orange); }
+.badge-high { color: var(--red); }
+.vol-low { color: var(--green); }
+.vol-mid { color: var(--orange); }
+.vol-high { color: var(--red); }
+.footer {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.note {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.note strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Crypto Realized Volatility</h1>
+<div class="subtitle">7-day annualized realized vol + HAR-RV forecast · Coinbase perpetual futures · Sep 07, 2026 19:59 UTC</div>
+
+<div class="note">
+  <strong>Models:</strong> <strong>CC</strong> = Close-to-Close (log returns, std × √365) · <strong>PK</strong> = Parkinson (high-low, most efficient for 24/7) · <strong>HAR-RV</strong> = Heterogeneous Autoregressive forecast (daily/weekly/monthly RV components). 
+  Volume = CDE perp 24h USD notional. HAR-RV uses ~46 days of history — treat as proof of concept, not trading signal.
+</div>
+
+<div class="controls">
+  <div class="btn-group">
+    <span class="btn-group-label">Sort by</span>
+    <button class="active" data-sort="cc" data-dir="desc">CC ↓</button>
+    <button data-sort="pk" data-dir="desc">PK ↓</button>
+    <button data-sort="har" data-dir="desc">HAR-RV ↓</button>
+    <button data-sort="vol" data-dir="desc">Volume ↓</button>
+    <button data-sort="name" data-dir="asc">Name ↑</button>
+  </div>
+  <input type="text" class="filter-box" placeholder="Filter tokens..." id="filter">
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th data-sort="name">Token <span class="arrow"></span></th>
+      <th data-sort="vol">Vol 24h ($) <span class="arrow"></span></th>
+      <th data-sort="cc">CC (7d) <span class="arrow"></span></th>
+      <th data-sort="pk">PK (7d) <span class="arrow"></span></th>
+      <th data-sort="har">HAR-RV (fcast) <span class="arrow"></span></th>
+    </tr>
+  </thead>
+  <tbody id="table-body"></tbody>
+</table>
+
+<div class="footer">
+  Data: Coinbase Derivatives Exchange (CDE) perpetual candles · Auto-refreshes daily at 8:00 AM CDT<br>
+  HAR-RV coefficients fitted via OLS on daily Parkinson RV with 5-day weekly and 22-day monthly lookbacks.
+</div>
+
+<script>
+const DATA = [{"token": "ADA", "vol": 3636915.3, "cc": 91.7, "pk": 83.4, "har": 58.4}, {"token": "AVAX", "vol": 1042039.6, "cc": 47.3, "pk": 48.1, "har": 57.4}, {"token": "BCH", "vol": 1804005.0, "cc": 55.5, "pk": 63.8, "har": 62.4}, {"token": "BNB", "vol": 200743.25, "cc": 69.2, "pk": 41.7, "har": 32.6}, {"token": "BTC", "vol": 120704374.7, "cc": 46.9, "pk": 40.3, "har": 32.6}, {"token": "DOGE", "vol": 1745341.2, "cc": 77.3, "pk": 78.1, "har": 45.7}, {"token": "DOT", "vol": 2345694.4, "cc": 61.8, "pk": 86.9, "har": 141.3}, {"token": "ETH", "vol": 35008028.6, "cc": 47.3, "pk": 45.6, "har": 31.9}, {"token": "HBAR", "vol": 3539486.25, "cc": 48.3, "pk": 51.5, "har": 44.3}, {"token": "HYPE", "vol": 5078509.8, "cc": 74.0, "pk": 60.0, "har": 49.1}, {"token": "LINK", "vol": 8161861.5, "cc": 97.3, "pk": 76.7, "har": 74.2}, {"token": "LTC", "vol": 2008424.7, "cc": 62.9, "pk": 65.6, "har": 72.6}, {"token": "SHIB", "vol": 682273.1, "cc": 51.0, "pk": 50.7, "har": 42.7}, {"token": "SOL", "vol": 24203516.7, "cc": 46.2, "pk": 52.7, "har": 35.6}, {"token": "SUI", "vol": 4480256.4, "cc": 61.2, "pk": 82.3, "har": 87.8}, {"token": "XLM", "vol": 6303082.5, "cc": 52.4, "pk": 66.1, "har": 79.8}, {"token": "XRP", "vol": 23438096.0, "cc": 70.1, "pk": 61.1, "har": 54.8}];
+const TOKEN_COLORS = {"BTC": "#f7931a", "ETH": "#627eea", "SOL": "#9945ff", "XRP": "#23292f", "ADA": "#0033ad", "LTC": "#345d9d", "DOGE": "#c2a633", "AVAX": "#e84142", "LINK": "#2a5ada", "SUI": "#4da2ff", "BNB": "#f3ba2f", "HYPE": "#8b5cf6", "DOT": "#e6007a", "XLM": "#7d00ff", "SHIB": "#ffa409", "HBAR": "#00b39f", "BCH": "#8dc351"};
+
+let currentSort = { field: "cc", dir: "desc" };
+let filterText = "";
+
+function formatVol(v) {
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+  return v.toFixed(0);
+}
+
+function volClass(v) {
+  if (v < 1e6) return "vol-low";
+  if (v < 10e6) return "vol-mid";
+  return "vol-high";
+}
+
+function volBadge(vol) {
+  if (vol < 50) return "badge-low";
+  if (vol < 80) return "badge-mid";
+  return "badge-high";
+}
+
+function getBarWidth(val, max) {
+  return Math.min(100, (val / max) * 100);
+}
+
+function render() {
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = "";
+
+  let rows = DATA.filter(d => d.token.toLowerCase().includes(filterText.toLowerCase()));
+
+  const { field, dir } = currentSort;
+  rows.sort((a, b) => {
+    let va = a[field];
+    let vb = b[field];
+    if (field === "name") {
+      return dir === "asc" ? a.token.localeCompare(b.token) : b.token.localeCompare(a.token);
+    }
+    return dir === "asc" ? va - vb : vb - va;
+  });
+
+  const maxCC = Math.max(...rows.map(r => r.cc));
+  const maxPK = Math.max(...rows.map(r => r.pk));
+  const maxHAR = Math.max(...rows.map(r => r.har));
+
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    const color = TOKEN_COLORS[r.token] || "#666";
+    tr.innerHTML = `
+      <td>
+        <div class="token-cell">
+          <div class="token-icon" style="background:${color}">${r.token.slice(0,2)}</div>
+          ${r.token}
+        </div>
+      </td>
+      <td class="${volClass(r.vol)}">${formatVol(r.vol)}</td>
+      <td>
+        <span class="vol-bar" style="width:${getBarWidth(r.cc, maxCC) * 0.6}px;background:var(--accent)"></span>
+        <span class="${volBadge(r.cc)}">${r.cc.toFixed(1)}%</span>
+      </td>
+      <td>
+        <span class="vol-bar" style="width:${getBarWidth(r.pk, maxPK) * 0.6}px;background:var(--green)"></span>
+        <span class="${volBadge(r.pk)}">${r.pk.toFixed(1)}%</span>
+      </td>
+      <td>
+        <span class="vol-bar" style="width:${getBarWidth(r.har, maxHAR) * 0.6}px;background:var(--orange)"></span>
+        <span class="${volBadge(r.har)}">${r.har.toFixed(1)}%</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll("th").forEach(th => {
+    th.querySelector(".arrow").textContent = "";
+    if (th.dataset.sort === field) {
+      th.querySelector(".arrow").textContent = dir === "asc" ? "↑" : "↓";
+    }
+  });
+}
+
+document.querySelectorAll(".btn-group button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".btn-group button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentSort = { field: btn.dataset.sort, dir: btn.dataset.dir };
+    render();
+  });
+});
+
+document.querySelectorAll("th").forEach(th => {
+  th.addEventListener("click", () => {
+    const field = th.dataset.sort;
+    if (currentSort.field === field) {
+      currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+    } else {
+      currentSort = { field, dir: field === "name" ? "asc" : "desc" };
+    }
+    document.querySelectorAll(".btn-group button").forEach(b => {
+      b.classList.toggle("active", b.dataset.sort === field && b.dataset.dir === currentSort.dir);
+    });
+    render();
+  });
+});
+
+document.getElementById("filter").addEventListener("input", (e) => {
+  filterText = e.target.value;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
