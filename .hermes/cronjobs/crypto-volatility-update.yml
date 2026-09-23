@@ -1,0 +1,9 @@
+name: daily-crypto-volatility-update
+# Runs every day at 06:00 UTC
+# Updates data/data.json and bakes into index.html
+schedule: "0 6 * * *"
+command: "cd /c/Users/ethan/crypto-volatility && python generate_data.py --output data/data.json --self-contained"
+# For HyperTracker-fed alts, set HYPERTRACKER_API_KEY as an OS env var
+# before enabling this cron.  Without it, the dashboard still updates
+# prices + volatility + BTC/ETH/SOL liquidation clusters via free APIs.
+notify: true
