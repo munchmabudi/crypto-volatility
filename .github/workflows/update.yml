@@ -1,0 +1,53 @@
+name: Daily Dashboard Update
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 6:00 AM UTC daily
+  workflow_dispatch:      # manual trigger
+  push:
+    paths:
+      - 'generate_data.py'
+      - 'lib/**'
+      - '.github/workflows/update.yml'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate dashboard data
+        env:
+          HYPERTRACKER_API_KEY: ${{ secrets.HYPERTRACKER_API_KEY }}
+        run: |
+          python generate_data.py --output data/data.json
+
+      - name: Verify data was generated
+        run: |
+          if [ ! -f data/data.json ]; then echo "::error::data.json was not generated"; exit 1; fi
+          echo "data.json size: $(wc -c < data/data.json) bytes"
+
+      - name: Commit and push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/data.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update dashboard data ($(date -u +%Y-%m-%d))" || exit 0
+            git push
+          fi

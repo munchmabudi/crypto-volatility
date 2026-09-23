@@ -1,0 +1,6 @@
+# No external dependencies required — uses only Python stdlib (urllib, json, math).
+# This file exists so `pip install -r requirements.txt` works in CI
+# even though the imports are optional/future-proofing.
+#
+# Future optional deps if you want to extend:
+# requests==2.32.3

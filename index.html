@@ -2,7 +2,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crypto Volatility + Liquidation Dashboard</title>
 <style>
-:root { --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a; --text: #e1e4ed; --muted: #8b8fa3; --accent: #4f8cff; --green: #26c281; --orange: #f5a623; --red: #e0556a; }
+:root {
+  --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a;
+  --text: #e1e4ed; --muted: #8b8fa3; --accent: #4f8cff;
+  --green: #26c281; --orange: #f5a623; --red: #e0556a;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
 h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 4px; }
@@ -36,31 +40,56 @@ td:first-child { text-align: left; font-weight: 600; }
 .vol-card-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; }
 .vol-card-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); }
 .vol-card-value { color: var(--text); font-weight: 500; }
+.controls { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.btn-group { display: flex; gap: 4px; background: #2a2d3a; border-radius: 8px; padding: 4px; }
+.btn-group button { background: transparent; border: none; color: var(--muted); font-size: 0.8rem; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+.btn-group button.active, .btn-group button:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.filter-box { flex: 1; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; color: var(--text); outline: none; }
+.expanded-row td { text-align: left; font-weight: normal; }
+.whale-table th { background: #2a2d3a; }
+.refresh-btn { background: var(--accent); color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; margin-left: auto; }
+.refresh-btn:hover { opacity: 0.9; }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+.status-ok { background: rgba(38,194,129,0.2); color: var(--green); }
+.status-warn { background: rgba(245,166,35,0.2); color: var(--orange); }
+.status-error { background: rgba(224,85,106,0.2); color: var(--red); }
 </style></head><body>
 <h1>Crypto Volatility + Liquidation Dashboard</h1>
-<div class="subtitle">Sep 10, 2026 04:13 UTC</div>
+<div class="subtitle" id="subtitle">Loading data…</div>
+
 <div class="note"><strong>Distance (%)</strong> = (liq_price - current_price) / current_price × 100. + means liquidation is above current price (cascade up), - means below (cascade down).<br>
 <strong>Adj. Distance (σ)</strong> = distance in terms of daily volatility (HAR-RV). Lower = more likely.<br>
-<strong>Est. Move (%)</strong> = rough price impact if cascade triggers.<br>
+<strong>Est. Move (%)</strong> = rough price impact if cascade triggers (η·σ·√(Q/V), square-root law).<br>
 <strong>Move/Vol (σ)</strong> = est. move as multiple of daily vol.<br>
 <strong>Magnitude (x vol)</strong> = cumulative liquidation notional / daily volume.<br>
 <strong>CC</strong> = Close-to-Close realized vol. <strong>PK</strong> = Parkinson vol. <strong>HAR</strong> = HAR-RV forecast.<br>
-<strong>Click any token</strong> to expand and see all liquidation levels.</div>
+<strong>Click any token</strong> to expand and see all liquidation levels. <strong>Click a whale row</strong> to see its positions.</div>
+
 <h2>📈 Volatility (7-Day Realized + Forecast)</h2>
 <div class="vol-grid" id="vol-grid"></div>
+
 <h2>🔥 Danger Zones</h2>
 <div class="liq-section"><div style="display: flex; gap: 20px;">
 <div style="flex: 1;"><h3>Alts</h3><div id="zone-cards-alts"></div></div>
 <div style="flex: 1;"><h3>Majors</h3><div id="zone-cards-majors"></div></div>
 </div></div>
+
+<h2>🐋 Whale Positions Near Liquidation</h2>
+<div class="liq-section" id="whale-section" style="display:none;">
+<div id="whale-table-wrap"></div>
+</div>
+
 <h2>📊 Liquidation Price Levels</h2>
-<div class="controls"><div class="btn-group">
-<span class="btn-group-label">Sort by</span>
+<div class="controls">
+<div class="btn-group">
 <button class="active" data-sort="abs_distance" data-dir="asc">Distance ↑</button>
 <button data-sort="magnitude_ratio" data-dir="desc">Magnitude ↓</button>
 <button data-sort="est_move_pct" data-dir="desc">Est. Move ↓</button>
 <button data-sort="token" data-dir="asc">Token ↑</button>
-</div><input type="text" class="filter-box" placeholder="Filter tokens..." id="filter"></div>
+</div>
+<input type="text" class="filter-box" placeholder="Filter tokens…" id="filter">
+<button class="refresh-btn" onclick="loadData()">Refresh Data</button>
+</div>
 <table><thead><tr>
 <th data-sort="token">Token</th>
 <th data-sort="liq_price">Liq Price ($)</th>
@@ -74,21 +103,87 @@ td:first-child { text-align: left; font-weight: 600; }
 <th data-sort="move_per_vol">Move/Vol (σ)</th>
 <th data-sort="count">Levels</th>
 </tr></thead><tbody id="table-body"></tbody></table>
-<div class="footer">Data: Coinbase + HyperTracker · Computed: Sep 10, 2026 04:13 UTC<br>Not financial advice.</div>
+
+<div class="footer">Data: Hyperliquid + HyperTracker · <span id="data-source"></span> · <span id="last-updated"></span><br>Not financial advice.</div>
+
 <script>
-const ANALYSIS = [{"token": "HYPE", "liq_price": 67.3, "current_price": 84.18, "distance_pct": -20.05, "abs_distance": 20.05, "notional": 134145537.94334002, "cumulative_notional": 283990730.80224, "count": 23, "magnitude_ratio": 24.31, "direction": "DOWN", "adj_distance": 8.98, "all_levels": [{"liq_price": 82.5, "current_price": 84.18, "distance_pct": -2.0, "abs_distance": 2.0, "cumulative_notional": 3976.8913800000005, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 82.4, "current_price": 84.18, "distance_pct": -2.11, "abs_distance": 2.11, "cumulative_notional": 46960.753070000006, "count": 4, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 82.3, "current_price": 84.18, "distance_pct": -2.23, "abs_distance": 2.23, "cumulative_notional": 1359902.7957900004, "count": 19, "magnitude_ratio": 0.12, "direction": "DOWN"}, {"liq_price": 82.2, "current_price": 84.18, "distance_pct": -2.35, "abs_distance": 2.35, "cumulative_notional": 1427541.0318400003, "count": 16, "magnitude_ratio": 0.12, "direction": "DOWN"}, {"liq_price": 82.1, "current_price": 84.18, "distance_pct": -2.47, "abs_distance": 2.47, "cumulative_notional": 1435682.9902800003, "count": 9, "magnitude_ratio": 0.12, "direction": "DOWN"}, {"liq_price": 82.0, "current_price": 84.18, "distance_pct": -2.59, "abs_distance": 2.59, "cumulative_notional": 1574404.5894500003, "count": 19, "magnitude_ratio": 0.13, "direction": "DOWN"}, {"liq_price": 86.4, "current_price": 84.18, "distance_pct": 2.64, "abs_distance": 2.64, "cumulative_notional": 74272.26884, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 81.9, "current_price": 84.18, "distance_pct": -2.71, "abs_distance": 2.71, "cumulative_notional": 5454321.648930002, "count": 12, "magnitude_ratio": 0.47, "direction": "DOWN"}, {"liq_price": 81.8, "current_price": 84.18, "distance_pct": -2.83, "abs_distance": 2.83, "cumulative_notional": 5456342.017280002, "count": 8, "magnitude_ratio": 0.47, "direction": "DOWN"}, {"liq_price": 81.7, "current_price": 84.18, "distance_pct": -2.95, "abs_distance": 2.95, "cumulative_notional": 5497239.9851600025, "count": 4, "magnitude_ratio": 0.47, "direction": "DOWN"}], "est_move_pct": 0.8, "move_per_vol": 0.36}, {"token": "BNB", "liq_price": 639, "current_price": 724.4, "distance_pct": -11.79, "abs_distance": 11.79, "notional": 80502.00881, "cumulative_notional": 1875835.2089099998, "count": 3, "magnitude_ratio": 4.55, "direction": "DOWN", "adj_distance": 3.8, "all_levels": [{"liq_price": 717, "current_price": 724.4, "distance_pct": -1.02, "abs_distance": 1.02, "cumulative_notional": 33.28054, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 716, "current_price": 724.4, "distance_pct": -1.16, "abs_distance": 1.16, "cumulative_notional": 1098.25782, "count": 3, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 715, "current_price": 724.4, "distance_pct": -1.3, "abs_distance": 1.3, "cumulative_notional": 3393.89159, "count": 9, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 714, "current_price": 724.4, "distance_pct": -1.44, "abs_distance": 1.44, "cumulative_notional": 4246.8863, "count": 4, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 713, "current_price": 724.4, "distance_pct": -1.57, "abs_distance": 1.57, "cumulative_notional": 14475.58792, "count": 5, "magnitude_ratio": 0.04, "direction": "DOWN"}, {"liq_price": 712, "current_price": 724.4, "distance_pct": -1.71, "abs_distance": 1.71, "cumulative_notional": 21485.48253, "count": 4, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 711, "current_price": 724.4, "distance_pct": -1.85, "abs_distance": 1.85, "cumulative_notional": 25060.24662, "count": 8, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 710, "current_price": 724.4, "distance_pct": -1.99, "abs_distance": 1.99, "cumulative_notional": 26471.77561, "count": 6, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 709, "current_price": 724.4, "distance_pct": -2.13, "abs_distance": 2.13, "cumulative_notional": 29148.68861, "count": 2, "magnitude_ratio": 0.07, "direction": "DOWN"}, {"liq_price": 708, "current_price": 724.4, "distance_pct": -2.26, "abs_distance": 2.26, "cumulative_notional": 30607.244450000002, "count": 2, "magnitude_ratio": 0.07, "direction": "DOWN"}], "est_move_pct": 0.14, "move_per_vol": 0.05}, {"token": "ETH", "liq_price": 2390, "current_price": 2476.0, "distance_pct": -3.47, "abs_distance": 3.47, "notional": 100668173.62712996, "cumulative_notional": 116314355.56415994, "count": 142, "magnitude_ratio": 1.19, "direction": "DOWN", "adj_distance": 3.13, "all_levels": [{"liq_price": 2490, "current_price": 2476.0, "distance_pct": 0.57, "abs_distance": 0.57, "cumulative_notional": 178.84851, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 2500, "current_price": 2476.0, "distance_pct": 0.97, "abs_distance": 0.97, "cumulative_notional": 22480.490859999998, "count": 9, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 2510, "current_price": 2476.0, "distance_pct": 1.37, "abs_distance": 1.37, "cumulative_notional": 253980.9632499999, "count": 38, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 2440, "current_price": 2476.0, "distance_pct": -1.45, "abs_distance": 1.45, "cumulative_notional": 496598.7381799997, "count": 175, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 2520, "current_price": 2476.0, "distance_pct": 1.78, "abs_distance": 1.78, "cumulative_notional": 490671.01087, "count": 34, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 2430, "current_price": 2476.0, "distance_pct": -1.86, "abs_distance": 1.86, "cumulative_notional": 1642718.864320002, "count": 198, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 2530, "current_price": 2476.0, "distance_pct": 2.18, "abs_distance": 2.18, "cumulative_notional": 25349917.059580006, "count": 34, "magnitude_ratio": 0.26, "direction": "UP"}, {"liq_price": 2420, "current_price": 2476.0, "distance_pct": -2.26, "abs_distance": 2.26, "cumulative_notional": 5037095.86726, "count": 229, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 2540, "current_price": 2476.0, "distance_pct": 2.58, "abs_distance": 2.58, "cumulative_notional": 25704857.140930004, "count": 52, "magnitude_ratio": 0.26, "direction": "UP"}, {"liq_price": 2410, "current_price": 2476.0, "distance_pct": -2.67, "abs_distance": 2.67, "cumulative_notional": 9452473.992449991, "count": 193, "magnitude_ratio": 0.1, "direction": "DOWN"}], "est_move_pct": 0.06, "move_per_vol": 0.05}, {"token": "SOL", "liq_price": 65.6, "current_price": 101.98, "distance_pct": -35.67, "abs_distance": 35.67, "notional": 7794079.073600001, "cumulative_notional": 150675684.43759996, "count": 5, "magnitude_ratio": 4.84, "direction": "DOWN", "adj_distance": 18.5, "all_levels": [{"liq_price": 103, "current_price": 101.98, "distance_pct": 1.0, "abs_distance": 1.0, "cumulative_notional": 68551.6392, "count": 12, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 100, "current_price": 101.98, "distance_pct": -1.94, "abs_distance": 1.94, "cumulative_notional": 86407.66400000005, "count": 61, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 104, "current_price": 101.98, "distance_pct": 1.98, "abs_distance": 1.98, "cumulative_notional": 916474.3776000002, "count": 47, "magnitude_ratio": 0.03, "direction": "UP"}, {"liq_price": 99.9, "current_price": 101.98, "distance_pct": -2.04, "abs_distance": 2.04, "cumulative_notional": 217439.62960000004, "count": 10, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 99.8, "current_price": 101.98, "distance_pct": -2.14, "abs_distance": 2.14, "cumulative_notional": 412918.41280000005, "count": 14, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 99.7, "current_price": 101.98, "distance_pct": -2.24, "abs_distance": 2.24, "cumulative_notional": 511617.1552000001, "count": 21, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 99.6, "current_price": 101.98, "distance_pct": -2.33, "abs_distance": 2.33, "cumulative_notional": 575559.6400000001, "count": 26, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 99.5, "current_price": 101.98, "distance_pct": -2.43, "abs_distance": 2.43, "cumulative_notional": 777676.0936000001, "count": 16, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 99.4, "current_price": 101.98, "distance_pct": -2.53, "abs_distance": 2.53, "cumulative_notional": 816528.0216000001, "count": 19, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 99.3, "current_price": 101.98, "distance_pct": -2.63, "abs_distance": 2.63, "cumulative_notional": 843498.6416000001, "count": 29, "magnitude_ratio": 0.03, "direction": "DOWN"}], "est_move_pct": 0.15, "move_per_vol": 0.08}, {"token": "BTC", "liq_price": 80280, "current_price": 78315.0, "distance_pct": 2.51, "abs_distance": 2.51, "notional": 28012310.241696, "cumulative_notional": 115561707.75554398, "count": 3, "magnitude_ratio": 0.33, "direction": "UP", "adj_distance": 2.79, "all_levels": [{"liq_price": 78660, "current_price": 78315.0, "distance_pct": 0.44, "abs_distance": 0.44, "cumulative_notional": 317.911398, "count": 2, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 78690, "current_price": 78315.0, "distance_pct": 0.48, "abs_distance": 0.48, "cumulative_notional": 1919238.157023, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78700, "current_price": 78315.0, "distance_pct": 0.49, "abs_distance": 0.49, "cumulative_notional": 1941989.180838, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78710, "current_price": 78315.0, "distance_pct": 0.5, "abs_distance": 0.5, "cumulative_notional": 2565111.964611, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78720, "current_price": 78315.0, "distance_pct": 0.52, "abs_distance": 0.52, "cumulative_notional": 2642105.250402, "count": 1, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78750, "current_price": 78315.0, "distance_pct": 0.56, "abs_distance": 0.56, "cumulative_notional": 2642275.168563, "count": 1, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78760, "current_price": 78315.0, "distance_pct": 0.57, "abs_distance": 0.57, "cumulative_notional": 2642707.402779, "count": 3, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78770, "current_price": 78315.0, "distance_pct": 0.58, "abs_distance": 0.58, "cumulative_notional": 2643893.697774, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78780, "current_price": 78315.0, "distance_pct": 0.59, "abs_distance": 0.59, "cumulative_notional": 2644274.251812, "count": 1, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 78790, "current_price": 78315.0, "distance_pct": 0.61, "abs_distance": 0.61, "cumulative_notional": 2644752.6849749996, "count": 1, "magnitude_ratio": 0.01, "direction": "UP"}], "est_move_pct": 0.02, "move_per_vol": 0.02}, {"token": "DOGE", "liq_price": 0.04, "current_price": 0.08606, "distance_pct": -53.52, "abs_distance": 53.52, "notional": 8931840.316367993, "cumulative_notional": 18859001.86022399, "count": 62, "magnitude_ratio": 3.97, "direction": "DOWN", "adj_distance": 17.43, "all_levels": [{"liq_price": 0.09, "current_price": 0.08606, "distance_pct": 4.58, "abs_distance": 4.58, "cumulative_notional": 49846.89268800001, "count": 24, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 0.08, "current_price": 0.08606, "distance_pct": -7.04, "abs_distance": 7.04, "cumulative_notional": 2441772.8961599935, "count": 627, "magnitude_ratio": 0.51, "direction": "DOWN"}, {"liq_price": 0.1, "current_price": 0.08606, "distance_pct": 16.2, "abs_distance": 16.2, "cumulative_notional": 73180.461888, "count": 23, "magnitude_ratio": 0.02, "direction": "UP"}, {"liq_price": 0.07, "current_price": 0.08606, "distance_pct": -18.66, "abs_distance": 18.66, "cumulative_notional": 4890554.235599995, "count": 314, "magnitude_ratio": 1.03, "direction": "DOWN"}, {"liq_price": 0.11, "current_price": 0.08606, "distance_pct": 27.82, "abs_distance": 27.82, "cumulative_notional": 80538.747696, "count": 21, "magnitude_ratio": 0.02, "direction": "UP"}, {"liq_price": 0.06, "current_price": 0.08606, "distance_pct": -30.28, "abs_distance": 30.28, "cumulative_notional": 9228614.549471997, "count": 181, "magnitude_ratio": 1.94, "direction": "DOWN"}, {"liq_price": 0.12, "current_price": 0.08606, "distance_pct": 39.44, "abs_distance": 39.44, "cumulative_notional": 98343.87753600001, "count": 11, "magnitude_ratio": 0.02, "direction": "UP"}, {"liq_price": 0.05, "current_price": 0.08606, "distance_pct": -41.9, "abs_distance": 41.9, "cumulative_notional": 9927161.543855997, "count": 107, "magnitude_ratio": 2.09, "direction": "DOWN"}, {"liq_price": 0.13, "current_price": 0.08606, "distance_pct": 51.06, "abs_distance": 51.06, "cumulative_notional": 1117949.5348800002, "count": 18, "magnitude_ratio": 0.24, "direction": "UP"}, {"liq_price": 0.04, "current_price": 0.08606, "distance_pct": -53.52, "abs_distance": 53.52, "cumulative_notional": 18859001.86022399, "count": 62, "magnitude_ratio": 3.97, "direction": "DOWN"}], "est_move_pct": 0.13, "move_per_vol": 0.04}, {"token": "AVAX", "liq_price": 7.48, "current_price": 7.83, "distance_pct": -4.47, "abs_distance": 4.47, "notional": 234324.43177, "cumulative_notional": 245976.41367, "count": 2, "magnitude_ratio": 0.31, "direction": "DOWN", "adj_distance": 1.85, "all_levels": [{"liq_price": 7.69, "current_price": 7.83, "distance_pct": -1.79, "abs_distance": 1.79, "cumulative_notional": 240.986655, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.68, "current_price": 7.83, "distance_pct": -1.92, "abs_distance": 1.92, "cumulative_notional": 383.61141, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.66, "current_price": 7.83, "distance_pct": -2.17, "abs_distance": 2.17, "cumulative_notional": 1025.696035, "count": 3, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.65, "current_price": 7.83, "distance_pct": -2.3, "abs_distance": 2.3, "cumulative_notional": 1044.9780899999998, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.64, "current_price": 7.83, "distance_pct": -2.43, "abs_distance": 2.43, "cumulative_notional": 1140.99804, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.63, "current_price": 7.83, "distance_pct": -2.55, "abs_distance": 2.55, "cumulative_notional": 3868.823335, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.62, "current_price": 7.83, "distance_pct": -2.68, "abs_distance": 2.68, "cumulative_notional": 3946.4980100000002, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 7.59, "current_price": 7.83, "distance_pct": -3.07, "abs_distance": 3.07, "cumulative_notional": 4124.330080000001, "count": 2, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 7.58, "current_price": 7.83, "distance_pct": -3.19, "abs_distance": 3.19, "cumulative_notional": 4136.039830000001, "count": 1, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 8.09, "current_price": 7.83, "distance_pct": 3.32, "abs_distance": 3.32, "cumulative_notional": 125.606585, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}], "est_move_pct": 0.02, "move_per_vol": 0.01}, {"token": "LTC", "liq_price": 52.3, "current_price": 52.83, "distance_pct": -1.0, "abs_distance": 1.0, "notional": 85567.43256, "cumulative_notional": 86133.31276, "count": 1, "magnitude_ratio": 0.05, "direction": "DOWN", "adj_distance": 0.31, "all_levels": [{"liq_price": 52.5, "current_price": 52.83, "distance_pct": -0.62, "abs_distance": 0.62, "cumulative_notional": 220.00576, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 52.4, "current_price": 52.83, "distance_pct": -0.81, "abs_distance": 0.81, "cumulative_notional": 565.8802000000001, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 52.3, "current_price": 52.83, "distance_pct": -1.0, "abs_distance": 1.0, "cumulative_notional": 86133.31276, "count": 1, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 52.2, "current_price": 52.83, "distance_pct": -1.19, "abs_distance": 1.19, "cumulative_notional": 86171.39068, "count": 1, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 52.1, "current_price": 52.83, "distance_pct": -1.38, "abs_distance": 1.38, "cumulative_notional": 96713.15706, "count": 1, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 51.9, "current_price": 52.83, "distance_pct": -1.76, "abs_distance": 1.76, "cumulative_notional": 107726.66656, "count": 2, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 51.8, "current_price": 52.83, "distance_pct": -1.95, "abs_distance": 1.95, "cumulative_notional": 129373.43522, "count": 3, "magnitude_ratio": 0.08, "direction": "DOWN"}, {"liq_price": 51.7, "current_price": 52.83, "distance_pct": -2.14, "abs_distance": 2.14, "cumulative_notional": 149776.32516, "count": 3, "magnitude_ratio": 0.09, "direction": "DOWN"}, {"liq_price": 51.6, "current_price": 52.83, "distance_pct": -2.33, "abs_distance": 2.33, "cumulative_notional": 157682.78216, "count": 7, "magnitude_ratio": 0.09, "direction": "DOWN"}, {"liq_price": 51.5, "current_price": 52.83, "distance_pct": -2.52, "abs_distance": 2.52, "cumulative_notional": 160877.09656, "count": 4, "magnitude_ratio": 0.09, "direction": "DOWN"}], "est_move_pct": 0.03, "move_per_vol": 0.01}, {"token": "XRP", "liq_price": 0.94, "current_price": 1.3906, "distance_pct": -32.4, "abs_distance": 32.4, "notional": 48831981.49760001, "cumulative_notional": 85670708.3904, "count": 31, "magnitude_ratio": 1.44, "direction": "DOWN", "adj_distance": 19.02, "all_levels": [{"liq_price": 1.38, "current_price": 1.3906, "distance_pct": -0.76, "abs_distance": 0.76, "cumulative_notional": 11204.8384, "count": 4, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 1.41, "current_price": 1.3906, "distance_pct": 1.4, "abs_distance": 1.4, "cumulative_notional": 13242.208, "count": 4, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 1.37, "current_price": 1.3906, "distance_pct": -1.48, "abs_distance": 1.48, "cumulative_notional": 547271.9168000002, "count": 70, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 1.42, "current_price": 1.3906, "distance_pct": 2.11, "abs_distance": 2.11, "cumulative_notional": 69199.73760000001, "count": 14, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 1.36, "current_price": 1.3906, "distance_pct": -2.2, "abs_distance": 2.2, "cumulative_notional": 1440350.8671999997, "count": 113, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 1.43, "current_price": 1.3906, "distance_pct": 2.83, "abs_distance": 2.83, "cumulative_notional": 125321.1456, "count": 12, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 1.35, "current_price": 1.3906, "distance_pct": -2.92, "abs_distance": 2.92, "cumulative_notional": 1676931.5583999997, "count": 67, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 1.44, "current_price": 1.3906, "distance_pct": 3.55, "abs_distance": 3.55, "cumulative_notional": 529649.4336000001, "count": 7, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 1.34, "current_price": 1.3906, "distance_pct": -3.64, "abs_distance": 3.64, "cumulative_notional": 1757720.8319999997, "count": 42, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 1.45, "current_price": 1.3906, "distance_pct": 4.27, "abs_distance": 4.27, "cumulative_notional": 541309.7984000001, "count": 16, "magnitude_ratio": 0.01, "direction": "UP"}], "est_move_pct": 0.06, "move_per_vol": 0.04}, {"token": "LINK", "liq_price": 8.77, "current_price": 11.825, "distance_pct": -25.84, "abs_distance": 25.84, "notional": 4720400.0, "cumulative_notional": 8157681.9904000005, "count": 1, "magnitude_ratio": 1.03, "direction": "DOWN", "adj_distance": 5.38, "all_levels": [{"liq_price": 11.6, "current_price": 11.825, "distance_pct": -1.9, "abs_distance": 1.9, "cumulative_notional": 16305.441699999998, "count": 7, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 11.5, "current_price": 11.825, "distance_pct": -2.75, "abs_distance": 2.75, "cumulative_notional": 33792.16349999999, "count": 21, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 11.4, "current_price": 11.825, "distance_pct": -3.59, "abs_distance": 3.59, "cumulative_notional": 79250.79559999998, "count": 24, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 12.3, "current_price": 11.825, "distance_pct": 4.02, "abs_distance": 4.02, "cumulative_notional": 2466.409, "count": 4, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 11.3, "current_price": 11.825, "distance_pct": -4.44, "abs_distance": 4.44, "cumulative_notional": 108399.26559999998, "count": 17, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 12.4, "current_price": 11.825, "distance_pct": 4.86, "abs_distance": 4.86, "cumulative_notional": 2832.2400000000002, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 11.2, "current_price": 11.825, "distance_pct": -5.29, "abs_distance": 5.29, "cumulative_notional": 177207.35629999998, "count": 17, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 12.5, "current_price": 11.825, "distance_pct": 5.71, "abs_distance": 5.71, "cumulative_notional": 13515.6853, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 11.1, "current_price": 11.825, "distance_pct": -6.13, "abs_distance": 6.13, "cumulative_notional": 229230.8847, "count": 26, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 11.0, "current_price": 11.825, "distance_pct": -6.98, "abs_distance": 6.98, "cumulative_notional": 257013.979, "count": 14, "magnitude_ratio": 0.03, "direction": "DOWN"}], "est_move_pct": 0.05, "move_per_vol": 0.01}, {"token": "XLM", "liq_price": 0.17, "current_price": 0.18039, "distance_pct": -5.76, "abs_distance": 5.76, "notional": 1150698.8550399998, "cumulative_notional": 1150698.8550399998, "count": 39, "magnitude_ratio": 0.15, "direction": "DOWN", "adj_distance": 2.15, "all_levels": [{"liq_price": 0.17, "current_price": 0.18039, "distance_pct": -5.76, "abs_distance": 5.76, "cumulative_notional": 1150698.8550399998, "count": 39, "magnitude_ratio": 0.15, "direction": "DOWN"}, {"liq_price": 0.2, "current_price": 0.18039, "distance_pct": 10.87, "abs_distance": 10.87, "cumulative_notional": 4914.044159999999, "count": 9, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.16, "current_price": 0.18039, "distance_pct": -11.3, "abs_distance": 11.3, "cumulative_notional": 1206131.9251199998, "count": 55, "magnitude_ratio": 0.16, "direction": "DOWN"}, {"liq_price": 0.21, "current_price": 0.18039, "distance_pct": 16.41, "abs_distance": 16.41, "cumulative_notional": 5126.272639999998, "count": 3, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.15, "current_price": 0.18039, "distance_pct": -16.85, "abs_distance": 16.85, "cumulative_notional": 1242036.3718399997, "count": 32, "magnitude_ratio": 0.16, "direction": "DOWN"}, {"liq_price": 0.22, "current_price": 0.18039, "distance_pct": 21.96, "abs_distance": 21.96, "cumulative_notional": 5185.905599999998, "count": 2, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.14, "current_price": 0.18039, "distance_pct": -22.39, "abs_distance": 22.39, "cumulative_notional": 1454157.1161599997, "count": 47, "magnitude_ratio": 0.19, "direction": "DOWN"}, {"liq_price": 0.23, "current_price": 0.18039, "distance_pct": 27.5, "abs_distance": 27.5, "cumulative_notional": 5497.041919999998, "count": 2, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.13, "current_price": 0.18039, "distance_pct": -27.93, "abs_distance": 27.93, "cumulative_notional": 1482891.7353599998, "count": 20, "magnitude_ratio": 0.19, "direction": "DOWN"}, {"liq_price": 0.24, "current_price": 0.18039, "distance_pct": 33.05, "abs_distance": 33.05, "cumulative_notional": 5690.353599999998, "count": 2, "magnitude_ratio": 0.0, "direction": "UP"}], "est_move_pct": 0.01, "move_per_vol": 0.0}, {"token": "SUI", "liq_price": 0.38, "current_price": 0.7716, "distance_pct": -50.75, "abs_distance": 50.75, "notional": 2329708.6956779994, "cumulative_notional": 7738224.586326, "count": 14, "magnitude_ratio": 1.03, "direction": "DOWN", "adj_distance": 16.27, "all_levels": [{"liq_price": 0.76, "current_price": 0.7716, "distance_pct": -1.5, "abs_distance": 1.5, "cumulative_notional": 359.1605880000001, "count": 3, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 0.75, "current_price": 0.7716, "distance_pct": -2.8, "abs_distance": 2.8, "cumulative_notional": 226836.37902599998, "count": 20, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 0.8, "current_price": 0.7716, "distance_pct": 3.68, "abs_distance": 3.68, "cumulative_notional": 4225.445838000001, "count": 3, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.74, "current_price": 0.7716, "distance_pct": -4.1, "abs_distance": 4.1, "cumulative_notional": 258888.38386499998, "count": 17, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 0.81, "current_price": 0.7716, "distance_pct": 4.98, "abs_distance": 4.98, "cumulative_notional": 7717.951710000001, "count": 9, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.73, "current_price": 0.7716, "distance_pct": -5.39, "abs_distance": 5.39, "cumulative_notional": 399380.72634, "count": 29, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 0.72, "current_price": 0.7716, "distance_pct": -6.69, "abs_distance": 6.69, "cumulative_notional": 967721.503509, "count": 20, "magnitude_ratio": 0.13, "direction": "DOWN"}, {"liq_price": 0.83, "current_price": 0.7716, "distance_pct": 7.57, "abs_distance": 7.57, "cumulative_notional": 265801.14801, "count": 4, "magnitude_ratio": 0.04, "direction": "UP"}, {"liq_price": 0.71, "current_price": 0.7716, "distance_pct": -7.98, "abs_distance": 7.98, "cumulative_notional": 1009903.8681719999, "count": 13, "magnitude_ratio": 0.13, "direction": "DOWN"}, {"liq_price": 0.84, "current_price": 0.7716, "distance_pct": 8.86, "abs_distance": 8.86, "cumulative_notional": 816045.709743, "count": 2, "magnitude_ratio": 0.11, "direction": "UP"}], "est_move_pct": 0.05, "move_per_vol": 0.02}, {"token": "ADA", "liq_price": 0.4, "current_price": 0.2138, "distance_pct": 87.09, "abs_distance": 87.09, "notional": 4829940.1596800005, "cumulative_notional": 6535707.1046400005, "count": 4, "magnitude_ratio": 0.96, "direction": "UP", "adj_distance": 32.15, "all_levels": [{"liq_price": 0.21, "current_price": 0.2138, "distance_pct": -1.78, "abs_distance": 1.78, "cumulative_notional": 22480.351840000003, "count": 17, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 0.22, "current_price": 0.2138, "distance_pct": 2.9, "abs_distance": 2.9, "cumulative_notional": 12515.91024, "count": 7, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.2, "current_price": 0.2138, "distance_pct": -6.45, "abs_distance": 6.45, "cumulative_notional": 107549.85247999999, "count": 25, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 0.23, "current_price": 0.2138, "distance_pct": 7.58, "abs_distance": 7.58, "cumulative_notional": 29620.11312, "count": 9, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.19, "current_price": 0.2138, "distance_pct": -11.13, "abs_distance": 11.13, "cumulative_notional": 419119.08735999995, "count": 28, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 0.24, "current_price": 0.2138, "distance_pct": 12.25, "abs_distance": 12.25, "cumulative_notional": 32106.31808, "count": 7, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.18, "current_price": 0.2138, "distance_pct": -15.81, "abs_distance": 15.81, "cumulative_notional": 813858.56448, "count": 27, "magnitude_ratio": 0.12, "direction": "DOWN"}, {"liq_price": 0.25, "current_price": 0.2138, "distance_pct": 16.93, "abs_distance": 16.93, "cumulative_notional": 40910.72976, "count": 7, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 0.17, "current_price": 0.2138, "distance_pct": -20.49, "abs_distance": 20.49, "cumulative_notional": 1477242.7569599997, "count": 23, "magnitude_ratio": 0.22, "direction": "DOWN"}, {"liq_price": 0.26, "current_price": 0.2138, "distance_pct": 21.61, "abs_distance": 21.61, "cumulative_notional": 122559.85903999998, "count": 6, "magnitude_ratio": 0.02, "direction": "UP"}], "est_move_pct": 0.05, "move_per_vol": 0.02}, {"token": "DOT", "liq_price": 1.02, "current_price": 1.102, "distance_pct": -7.44, "abs_distance": 7.44, "notional": 35337.48052, "cumulative_notional": 81617.42860000001, "count": 4, "magnitude_ratio": 0.05, "direction": "DOWN", "adj_distance": 0.94, "all_levels": [{"liq_price": 1.08, "current_price": 1.102, "distance_pct": -2.0, "abs_distance": 2.0, "cumulative_notional": 903.15367, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 1.07, "current_price": 1.102, "distance_pct": -2.9, "abs_distance": 2.9, "cumulative_notional": 19499.430200000006, "count": 9, "magnitude_ratio": 0.01, "direction": "DOWN"}, {"liq_price": 1.06, "current_price": 1.102, "distance_pct": -3.81, "abs_distance": 3.81, "cumulative_notional": 25693.829730000005, "count": 28, "magnitude_ratio": 0.02, "direction": "DOWN"}, {"liq_price": 1.05, "current_price": 1.102, "distance_pct": -4.72, "abs_distance": 4.72, "cumulative_notional": 42754.00246000001, "count": 7, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 1.16, "current_price": 1.102, "distance_pct": 5.26, "abs_distance": 5.26, "cumulative_notional": 3326.3407899999997, "count": 3, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 1.04, "current_price": 1.102, "distance_pct": -5.63, "abs_distance": 5.63, "cumulative_notional": 45746.412460000014, "count": 1, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 1.17, "current_price": 1.102, "distance_pct": 6.17, "abs_distance": 6.17, "cumulative_notional": 10506.90566, "count": 2, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 1.03, "current_price": 1.102, "distance_pct": -6.53, "abs_distance": 6.53, "cumulative_notional": 46279.94808000002, "count": 3, "magnitude_ratio": 0.03, "direction": "DOWN"}, {"liq_price": 1.02, "current_price": 1.102, "distance_pct": -7.44, "abs_distance": 7.44, "cumulative_notional": 81617.42860000001, "count": 4, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 1.19, "current_price": 1.102, "distance_pct": 7.99, "abs_distance": 7.99, "cumulative_notional": 32240.336170000002, "count": 1, "magnitude_ratio": 0.02, "direction": "UP"}], "est_move_pct": 0.03, "move_per_vol": 0.0}, {"token": "HBAR", "liq_price": 0.07, "current_price": 0.07698, "distance_pct": -9.07, "abs_distance": 9.07, "notional": 322399.65513600095, "cumulative_notional": 322399.65513600095, "count": 434, "magnitude_ratio": 0.04, "direction": "DOWN", "adj_distance": 4.22, "all_levels": [{"liq_price": 0.08, "current_price": 0.07698, "distance_pct": 3.92, "abs_distance": 3.92, "cumulative_notional": 157.04336700000002, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.07, "current_price": 0.07698, "distance_pct": -9.07, "abs_distance": 9.07, "cumulative_notional": 322399.65513600095, "count": 434, "magnitude_ratio": 0.04, "direction": "DOWN"}, {"liq_price": 0.09, "current_price": 0.07698, "distance_pct": 16.91, "abs_distance": 16.91, "cumulative_notional": 3028.946076000001, "count": 7, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.06, "current_price": 0.07698, "distance_pct": -22.06, "abs_distance": 22.06, "cumulative_notional": 422956.1449620009, "count": 92, "magnitude_ratio": 0.05, "direction": "DOWN"}, {"liq_price": 0.1, "current_price": 0.07698, "distance_pct": 29.9, "abs_distance": 29.9, "cumulative_notional": 36647.75696400001, "count": 5, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.05, "current_price": 0.07698, "distance_pct": -35.05, "abs_distance": 35.05, "cumulative_notional": 472771.4847570009, "count": 17, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 0.11, "current_price": 0.07698, "distance_pct": 42.89, "abs_distance": 42.89, "cumulative_notional": 37203.13548900001, "count": 5, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 0.04, "current_price": 0.07698, "distance_pct": -48.04, "abs_distance": 48.04, "cumulative_notional": 508486.3595370009, "count": 21, "magnitude_ratio": 0.06, "direction": "DOWN"}, {"liq_price": 0.12, "current_price": 0.07698, "distance_pct": 55.88, "abs_distance": 55.88, "cumulative_notional": 82842.87433500001, "count": 3, "magnitude_ratio": 0.01, "direction": "UP"}, {"liq_price": 0.03, "current_price": 0.07698, "distance_pct": -61.03, "abs_distance": 61.03, "cumulative_notional": 1235597.379354001, "count": 7, "magnitude_ratio": 0.16, "direction": "DOWN"}], "est_move_pct": 0.02, "move_per_vol": 0.01}, {"token": "BCH", "liq_price": 180, "current_price": 251.1, "distance_pct": -28.32, "abs_distance": 28.32, "notional": 6013.693410000001, "cumulative_notional": 318123.85473, "count": 4, "magnitude_ratio": 0.04, "direction": "DOWN", "adj_distance": 13.46, "all_levels": [{"liq_price": 248, "current_price": 251.1, "distance_pct": -1.23, "abs_distance": 1.23, "cumulative_notional": 480.26285, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 247, "current_price": 251.1, "distance_pct": -1.63, "abs_distance": 1.63, "cumulative_notional": 1456.08674, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 246, "current_price": 251.1, "distance_pct": -2.03, "abs_distance": 2.03, "cumulative_notional": 6834.27829, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 245, "current_price": 251.1, "distance_pct": -2.43, "abs_distance": 2.43, "cumulative_notional": 6940.11167, "count": 3, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 244, "current_price": 251.1, "distance_pct": -2.83, "abs_distance": 2.83, "cumulative_notional": 8470.93383, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 243, "current_price": 251.1, "distance_pct": -3.23, "abs_distance": 3.23, "cumulative_notional": 8675.57847, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 242, "current_price": 251.1, "distance_pct": -3.62, "abs_distance": 3.62, "cumulative_notional": 8804.98611, "count": 2, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 241, "current_price": 251.1, "distance_pct": -4.02, "abs_distance": 4.02, "cumulative_notional": 27934.24415, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}, {"liq_price": 262, "current_price": 251.1, "distance_pct": 4.34, "abs_distance": 4.34, "cumulative_notional": 39.123239999999996, "count": 1, "magnitude_ratio": 0.0, "direction": "UP"}, {"liq_price": 240, "current_price": 251.1, "distance_pct": -4.42, "abs_distance": 4.42, "cumulative_notional": 32950.04415, "count": 1, "magnitude_ratio": 0.0, "direction": "DOWN"}], "est_move_pct": 0.02, "move_per_vol": 0.01}];
-const TOKEN_COLORS = {"BTC": "#f7931a", "ETH": "#627eea", "SOL": "#9945ff", "XRP": "#23292f", "ADA": "#0033ad", "LTC": "#345d9d", "DOGE": "#c2a633", "AVAX": "#e84142", "LINK": "#2a5ada", "SUI": "#4da2ff", "BNB": "#f3ba2f", "HYPE": "#8b5cf6", "DOT": "#e6007a", "XLM": "#7d00ff", "SHIB": "#ffa409", "HBAR": "#00b39f", "BCH": "#8dc351"};
-const DANGER_ZONES_ALTS = {"within_1pct": ["LTC"], "within_2pct": ["LTC"], "within_5pct": ["AVAX", "LTC"]};
-const DANGER_ZONES_MAJORS = {"within_1pct": [], "within_2pct": [], "within_5pct": ["ETH", "BTC"]};
-const VOLATILITY = {"BTC": {"cc_vol": 17.16, "pk_vol": 39.14, "har_forecast": 17.16}, "ETH": {"cc_vol": 21.15, "pk_vol": 43.72, "har_forecast": 21.15}, "SOL": {"cc_vol": 36.84, "pk_vol": 49.86, "har_forecast": 36.84}, "XRP": {"cc_vol": 32.54, "pk_vol": 63.6, "har_forecast": 32.54}, "ADA": {"cc_vol": 51.76, "pk_vol": 89.98, "har_forecast": 51.76}, "LTC": {"cc_vol": 61.49, "pk_vol": 67.87, "har_forecast": 61.49}, "DOGE": {"cc_vol": 58.65, "pk_vol": 84.22, "har_forecast": 58.65}, "AVAX": {"cc_vol": 46.05, "pk_vol": 54.91, "har_forecast": 46.05}, "LINK": {"cc_vol": 91.77, "pk_vol": 85.45, "har_forecast": 91.77}, "SUI": {"cc_vol": 59.59, "pk_vol": 85.97, "har_forecast": 59.59}, "BNB": {"cc_vol": 59.34, "pk_vol": 48.04, "har_forecast": 59.34}, "HYPE": {"cc_vol": 42.65, "pk_vol": 62.29, "har_forecast": 42.65}, "DOT": {"cc_vol": 151.46, "pk_vol": 132.48, "har_forecast": 151.46}, "XLM": {"cc_vol": 51.24, "pk_vol": 68.87, "har_forecast": 51.24}, "SHIB": {"cc_vol": 43.13, "pk_vol": 55.78, "har_forecast": 43.13}, "HBAR": {"cc_vol": 41.11, "pk_vol": 58.7, "har_forecast": 41.11}, "BCH": {"cc_vol": 40.2, "pk_vol": 67.61, "har_forecast": 40.2}};
-const VOLUMES = {"BTC": 350270885.85, "ETH": 97637098.4, "BCH": 8629553.7, "SOL": 31127355.4, "HYPE": 11682500.4, "BNB": 412183.6, "LTC": 1700069.4, "LINK": 7893187.5, "XRP": 59328558.4, "AVAX": 794588.4, "DOT": 1627433.6, "SUI": 7511911.8, "ADA": 6836468.8, "HBAR": 7937022.9, "XLM": 7774809.0, "DOGE": 4751802.9, "SHIB": 152326.8};
+// ============================================================
+//  Data loading
+//  Primary: fetch ./data/data.json
+//  Fallback: inline DATA const (if --self-contained was used)
+// ============================================================
+let DATA = null;
+
+const FALLBACK_DATA = {"generated_at":"Sep 23, 2026 15:57 UTC","analysis":[],"volatility":{"BTC":{"cc_vol":40.438944018163575,"pk_vol":35.51982830482148,"har_forecast":40.434795818555614},"ETH":{"cc_vol":46.75184882669174,"pk_vol":46.03910585634364,"har_forecast":44.113211508969705},"SOL":{"cc_vol":60.24859246859977,"pk_vol":55.650435162571334,"har_forecast":58.437357732608454},"XRP":{"cc_vol":87.32978163595507,"pk_vol":77.10991618233301,"har_forecast":86.39800657272892},"ADA":{"cc_vol":88.29624077579192,"pk_vol":79.53889757021352,"har_forecast":91.63210276715874},"LTC":{"cc_vol":74.95752288399883,"pk_vol":67.5024073110341,"har_forecast":81.46391150695122},"DOGE":{"cc_vol":82.06602254013875,"pk_vol":79.02211735732566,"har_forecast":91.60492167005265},"AVAX":{"cc_vol":125.30438317876533,"pk_vol":103.10655942634996,"har_forecast":127.8968987206957},"LINK":{"cc_vol":69.64454727826957,"pk_vol":64.86994135572614,"har_forecast":71.55035584391516},"SUI":{"cc_vol":112.97324421383496,"pk_vol":100.99181570173658,"har_forecast":112.08180254364639},"BNB":{"cc_vol":41.88724934513158,"pk_vol":37.410582922664155,"har_forecast":43.360722933158065},"HYPE":{"cc_vol":67.98735589870299,"pk_vol":62.37521593387799,"har_forecast":66.40632069811507},"DOT":{"cc_vol":101.61333799947876,"pk_vol":85.60362618407625,"har_forecast":103.10305865546887},"XLM":{"cc_vol":100.42453035659598,"pk_vol":84.33154181691351,"har_forecast":98.83216986719997},"SHIB":{"cc_vol":0.0,"pk_vol":0.0,"har_forecast":0.0},"HBAR":{"cc_vol":95.2245435128548,"pk_vol":83.42844912213624,"har_forecast":99.19404019456535},"BCH":{"cc_vol":135.1682918966538,"pk_vol":109.14768210721026,"har_forecast":142.4994613997947}},"volumes":{"BTC":3699542752.913945,"ETH":1449309179.7310414,"SOL":377151319.71520025,"XRP":275107280.49779975,"ADA":14698357.408219991,"LTC":33064019.183029987,"DOGE":54784258.16992498,"AVAX":26736715.77346001,"LINK":21325882.437299997,"SUI":41609498.122974046,"BNB":13118885.400499996,"HYPE":713567200.5373605,"DOT":3851910.448239999,"XLM":6823885.839779999,"SHIB":151698156.331243,"HBAR":3443997.5066460017,"BCH":53038119.47306995},"token_colors":{"BTC":"#f7931a","ETH":"#627eea","SOL":"#9945ff","XRP":"#23292f","ADA":"#0033ad","LTC":"#345d9d","DOGE":"#c2a633","AVAX":"#e84142","LINK":"#2a5ada","SUI":"#4da2ff","BNB":"#f3ba2f","HYPE":"#8b5cf6","DOT":"#e6007a","XLM":"#7d00ff","SHIB":"#ffa409","HBAR":"#00b39f","BCH":"#8dc351"},"danger_zones":{"alts":{"within_1pct":[],"within_2pct":[],"within_5pct":[]},"majors":{"within_1pct":[],"within_2pct":[],"within_5pct":[]}},"whale_wallets":[{"address":"0x77ddcc4b6440b3a32b7802f053105c2fad3ae0e9","label":"Leviathan","token":"ETH","direction":"LONG","size":41228.487,"notional":109655406.8739,"entry_price":2693.92,"liq_price":2514.0670605886,"dist_to_liq_pct":-5.475540076377036,"leverage":10,"pnl":-1410841.76398,"roi_30d":-1.2866139520164477,"side":"long"}],"data_sources":{"prices":"Hyperliquid API (hyperliquid.xyz)","volumes":"Hyperliquid API","candles":"Hyperliquid candleSnapshot","liquidations_majors":"SmartMoneyAPI free tier","liquidations_alts":"not available (set HYPERTRACKER_API_KEY)","whale_wallets":"Hyperliquid clearinghouseState (public)"}};
+
+async function loadData() {
+  const subtitle = document.getElementById("subtitle");
+  try {
+    const resp = await fetch('./data/data.json', {cache: 'no-store'});
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    DATA = await resp.json();
+  } catch (e) {
+    // Fallback to inline data (self-contained build)
+    if (typeof FALLBACK_DATA !== 'undefined' && FALLBACK_DATA.analysis) {
+      DATA = FALLBACK_DATA;
+    } else {
+      subtitle.textContent = "⚠ Failed to load data: " + e.message;
+      return;
+    }
+  }
+  subtitle.textContent = `Generated: ${DATA.generated_at} · Sources: ${DATA.data_sources ? Object.entries(DATA.data_sources).filter(([k,v])=>v).map(([k,v])=>k+":"+v.split(" ")[0]).join(" · ") : "see footer"}`;
+  document.getElementById("last-updated").textContent = `Updated: ${DATA.generated_at}`;
+  document.getElementById("data-source").textContent = "Data: " + (DATA.data_sources?.prices || "Hyperliquid");
+  renderVolatility();
+  renderDangerZones();
+  renderWhales();
+  render();
+}
+
+// ============================================================
+//  Globals (from data.json)
+// ============================================================
+function get ANALYSIS() { return DATA.analysis || []; }
+function get TOKEN_COLORS() { return DATA.token_colors || {}; }
+function get DANGER_ZONES_ALTS() { return DATA.danger_zones?.alts || {within_1pct:[],within_2pct:[],within_5pct:[]}; }
+function get DANGER_ZONES_MAJORS() { return DATA.danger_zones?.majors || {within_1pct:[],within_2pct:[],within_5pct:[]}; }
+function get VOLATILITY() { return DATA.volatility || {}; }
+function get VOLUMES() { return DATA.volumes || {}; }
 let currentSort = { field: "abs_distance", dir: "asc" };
 let filterText = "";
-function formatVol(v) { if (v >= 1e9) return (v/1e9).toFixed(1)+"B"; if (v >= 1e6) return (v/1e6).toFixed(1)+"M"; if (v >= 1e3) return (v/1e3).toFixed(0)+"K"; return v.toFixed(0); }
-function formatPrice(p) { if (p >= 1000) return "$"+p.toLocaleString(undefined,{maximumFractionDigits:0}); if (p >= 1) return "$"+p.toFixed(2); return "$"+p.toFixed(4); }
-function distanceClass(d) { if (d < 2) return "distance-near"; if (d < 10) return "distance-mid"; return "distance-far"; }
-function magnitudeClass(m) { if (m > 50) return "magnitude-high"; if (m > 10) return "magnitude-mid"; return "magnitude-low"; }
 
+// ============================================================
+//  Formatting
+// ============================================================
+function formatVol(v) {
+  if (v >= 1e9) return (v/1e9).toFixed(1)+"B";
+  if (v >= 1e6) return (v/1e6).toFixed(1)+"M";
+  if (v >= 1e3) return (v/1e3).toFixed(0)+"K";
+  return v.toFixed(0);
+}
+function formatPrice(p) {
+  if (p >= 1000) return "$"+p.toLocaleString(undefined,{maximumFractionDigits:0});
+  if (p >= 1) return "$"+p.toFixed(2);
+  return "$"+p.toFixed(4);
+}
+function distanceClass(d) {
+  if (d < 2) return "distance-near";
+  if (d < 10) return "distance-mid";
+  return "distance-far";
+}
+function magnitudeClass(m) {
+  if (m > 50) return "magnitude-high";
+  if (m > 10) return "magnitude-mid";
+  return "magnitude-low";
+}
+function directionBadge(dir) {
+  const cls = dir === "DOWN" ? "status-error" : "status-ok";
+  return `<span class="status-badge ${cls}">${dir}</span>`;
+}
+
+// ============================================================
+//  Renderers
+// ============================================================
 function renderVolatility() {
   const grid = document.getElementById("vol-grid");
   grid.innerHTML = "";
@@ -98,13 +193,14 @@ function renderVolatility() {
     const div = document.createElement("div");
     div.className = "vol-card";
     div.innerHTML = `<div class="vol-card-title"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:6px;"></span>${token}</div>
-      <div class="vol-card-row"><span>CC Vol</span><span class="vol-card-value">${vol.cc_vol}%</span></div>
-      <div class="vol-card-row"><span>PK Vol</span><span class="vol-card-value">${vol.pk_vol}%</span></div>
-      <div class="vol-card-row"><span>HAR Forecast</span><span class="vol-card-value">${vol.har_forecast}%</span></div>
+      <div class="vol-card-row"><span>CC Vol</span><span class="vol-card-value">${vol.cc_vol.toFixed(2)}%</span></div>
+      <div class="vol-card-row"><span>PK Vol</span><span class="vol-card-value">${vol.pk_vol.toFixed(2)}%</span></div>
+      <div class="vol-card-row"><span>HAR Forecast</span><span class="vol-card-value">${vol.har_forecast.toFixed(2)}%</span></div>
       <div class="vol-card-row"><span>24h Volume</span><span class="vol-card-value">${formatVol(volume)}</span></div>`;
     grid.appendChild(div);
   }
 }
+
 function renderDangerZones() {
   const containerAlts = document.getElementById("zone-cards-alts");
   const containerMajors = document.getElementById("zone-cards-majors");
@@ -116,31 +212,68 @@ function renderDangerZones() {
     { key: "within_5pct", label: "📍 Within 5%", color: "var(--green)" },
   ];
   for (const zone of zones) {
-    const dataAlts = DANGER_ZONES_ALTS[zone.key];
-    const divAlts = document.createElement("div");
-    divAlts.className = "zone-card";
-    divAlts.innerHTML = `<div class="zone-title" style="color:${zone.color}">${zone.label}</div>
-      <div class="zone-value"><span class="zone-highlight">${dataAlts.length}</span> tokens</div>
-      <div class="zone-value">${dataAlts.join(", ") || "None"}</div>`;
-    containerAlts.appendChild(divAlts);
-    const dataMajors = DANGER_ZONES_MAJORS[zone.key];
-    const divMajors = document.createElement("div");
-    divMajors.className = "zone-card";
-    divMajors.innerHTML = `<div class="zone-title" style="color:${zone.color}">${zone.label}</div>
-      <div class="zone-value"><span class="zone-highlight">${dataMajors.length}</span> tokens</div>
-      <div class="zone-value">${dataMajors.join(", ") || "None"}</div>`;
-    containerMajors.appendChild(divMajors);
+    for (const [container, data] of [
+      [containerAlts, DANGER_ZONES_ALTS()],
+      [containerMajors, DANGER_ZONES_MAJORS()],
+    ]) {
+      const items = data[zone.key] || [];
+      const div = document.createElement("div");
+      div.className = "zone-card";
+      div.innerHTML = `<div class="zone-title" style="color:${zone.color}">${zone.label}</div>
+        <div class="zone-value"><span class="zone-highlight">${items.length}</span> tokens</div>
+        <div class="zone-value">${items.join(", ") || "None"}</div>`;
+      container.appendChild(div);
+    }
   }
 }
+
+function renderWhales() {
+  const section = document.getElementById("whale-section");
+  const wrap = document.getElementById("whale-table-wrap");
+  const whales = DATA.whale_wallets || [];
+  if (whales.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "block";
+  let html = `<table class="whale-table"><thead><tr>
+    <th>Wallet</th><th>Token</th><th>Direction</th><th>Size</th>
+    <th>Notional ($)</th><th>Entry</th><th>Liq Price</th>
+    <th>Dist to Liq</th><th>Leverage</th><th>ROI</th>
+  </tr></thead><tbody>`;
+  for (const w of whales) {
+    const color = TOKEN_COLORS[w.token] || "#666";
+    html += `<tr class="expandable-whale" onclick="toggleWhale(this)">
+      <td><strong>${w.label || w.address.slice(0,8)}</strong></td>
+      <td><span style="color:${color}">${w.token}</span></td>
+      <td>${directionBadge(w.direction)}</td>
+      <td>${w.size.toFixed(4)}</td>
+      <td>${formatVol(w.notional)}</td>
+      <td>${formatPrice(w.entry_price)}</td>
+      <td>${formatPrice(w.liq_price)}</td>
+      <td class="${w.dist_to_liq_pct < 5 ? 'distance-near' : 'distance-far'}">${w.dist_to_liq_pct.toFixed(1)}%</td>
+      <td>${w.leverage}x</td>
+      <td>${w.roi_30d > 0 ? '+' : ''}${w.roi_30d.toFixed(1)}%</td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+}
+
+function toggleWhale(row) {
+  // Toggle highlight on whale row
+  row.classList.toggle("whale-expanded");
+}
+
 function render() {
   const tbody = document.getElementById("table-body");
   tbody.innerHTML = "";
-  let rows = ANALYSIS.filter(d => d.token.toLowerCase().includes(filterText.toLowerCase()));
+  let rows = ANALYSIS().filter(d => d.token.toLowerCase().includes(filterText.toLowerCase()));
   const { field, dir } = currentSort;
   rows.sort((a, b) => {
-    let va, vb;
-    if (field === "token" || field === "direction") return dir === "asc" ? a.token.localeCompare(b.token) : b.token.localeCompare(a.token);
-    va = a[field]; vb = b[field];
+    if (field === "token" || field === "direction")
+      return dir === "asc" ? a.token.localeCompare(b.token) : b.token.localeCompare(a.token);
+    const va = a[field], vb = b[field];
     return dir === "asc" ? va - vb : vb - va;
   });
   rows.forEach(r => {
@@ -149,14 +282,18 @@ function render() {
     const color = TOKEN_COLORS[r.token] || "#666";
     const distClass = distanceClass(r.abs_distance);
     const magClass = magnitudeClass(r.magnitude_ratio);
-    tr.innerHTML = `<td><div class="token-cell"><span style="display:inline-block;width:16px;font-size:0.7rem;">▶</span><div class="token-icon" style="background:${color}">${r.token.slice(0,2)}</div>${r.token}</div></td>
-      <td><strong>${formatPrice(r.liq_price)}</strong></td><td>${formatPrice(r.current_price)}</td>
+    tr.innerHTML = `<td><div class="token-cell"><span style="display:inline-block;width:16px;font-size:0.7rem;">▶</span>
+      <div class="token-icon" style="background:${color}">${r.token.slice(0,2)}</div>${r.token}</div></td>
+      <td><strong>${formatPrice(r.liq_price)}</strong></td>
+      <td>${formatPrice(r.current_price)}</td>
       <td class="${distClass}">${r.distance_pct > 0 ? "+" : ""}${r.distance_pct.toFixed(2)}%</td>
-      <td class="${distClass}">${r.adj_distance.toFixed(2)}σ</td><td>${r.direction}</td>
+      <td class="${distClass}">${r.adj_distance.toFixed(2)}σ</td>
+      <td>${directionBadge(r.direction)}</td>
       <td><strong>${formatVol(r.cumulative_notional)}</strong></td>
       <td class="${magClass}">${r.magnitude_ratio.toFixed(1)}x</td>
       <td class="${magClass}"><strong>${r.est_move_pct.toFixed(2)}%</strong></td>
-      <td class="${magClass}">${r.move_per_vol.toFixed(2)}σ</td><td>${r.count}</td>`;
+      <td class="${magClass}">${r.move_per_vol.toFixed(2)}σ</td>
+      <td>${r.count}</td>`;
     tbody.appendChild(tr);
     tr.addEventListener("click", () => {
       if (tr.classList.contains("expanded")) {
@@ -173,23 +310,37 @@ function render() {
             levelTr.className = "expanded-row";
             levelTr.style.background = "rgba(255,255,255,0.02)";
             levelTr.style.fontSize = "0.8rem";
-            levelTr.innerHTML = `<td><div class="token-cell"><span style="display:inline-block;width:16px;"></span><span style="color:var(--muted)">${formatPrice(level.liq_price)}</span></div></td>
-              <td></td><td class="${distanceClass(level.abs_distance)}">${level.distance_pct > 0 ? "+" : ""}${level.distance_pct.toFixed(2)}%</td>
-              <td></td><td>${level.direction}</td><td>${formatVol(level.cumulative_notional)}</td>
-              <td class="${magnitudeClass(level.magnitude_ratio)}">${level.magnitude_ratio.toFixed(1)}x</td>
-              <td class="${magnitudeClass(level.magnitude_ratio)}">${level.est_move_pct || ""}%</td><td></td><td>${level.count}</td>`;
+            const lc = distanceClass(level.abs_distance);
+            const mc = magnitudeClass(level.magnitude_ratio);
+            levelTr.innerHTML = `<td><div class="token-cell"><span style="display:inline-block;width:16px;"></span>
+              <span style="color:var(--muted)">${formatPrice(level.liq_price)}</span></div></td>
+              <td></td><td class="${lc}">${level.distance_pct > 0 ? "+" : ""}${level.distance_pct.toFixed(2)}%</td>
+              <td></td><td>${level.direction}</td>
+              <td>${formatVol(level.cumulative_notional)}</td>
+              <td class="${mc}">${level.magnitude_ratio.toFixed(1)}x</td>
+              <td class="${mc}">${level.est_move_pct.toFixed(2)}%</td><td></td><td>${level.count}</td>`;
             tbody.insertBefore(levelTr, tr.nextSibling);
           });
         }
       }
     });
   });
+  // Update sort arrows
   document.querySelectorAll("th").forEach(th => {
-    th.querySelector(".arrow") && (th.querySelector(".arrow").textContent = "");
-    if (th.dataset.sort === field) th.querySelector(".arrow") && (th.querySelector(".arrow").textContent = dir === "asc" ? "↑" : "↓");
+    const arrow = th.querySelector(".arrow");
+    if (arrow) arrow.textContent = "";
+    if (th.dataset.sort === field) {
+      let a = th.querySelector(".arrow");
+      if (!a) { a = document.createElement("span"); a.className = "arrow"; th.appendChild(a); }
+      a.textContent = dir === "asc" ? " ↑" : " ↓";
+    }
   });
   renderDangerZones();
 }
+
+// ============================================================
+//  Event listeners
+// ============================================================
 document.querySelectorAll(".btn-group button").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".btn-group button").forEach(b => b.classList.remove("active"));
@@ -201,13 +352,23 @@ document.querySelectorAll(".btn-group button").forEach(btn => {
 document.querySelectorAll("th").forEach(th => {
   th.addEventListener("click", () => {
     const field = th.dataset.sort;
-    if (currentSort.field === field) { currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc"; }
-    else { currentSort = { field, dir: field === "token" || field === "direction" ? "asc" : "desc" }; }
-    document.querySelectorAll(".btn-group button").forEach(b => b.classList.toggle("active", b.dataset.sort === field && b.dataset.dir === currentSort.dir));
+    if (currentSort.field === field) {
+      currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+    } else {
+      currentSort = { field, dir: field === "token" || field === "direction" ? "asc" : "desc" };
+    }
+    document.querySelectorAll(".btn-group button").forEach(b =>
+      b.classList.toggle("active", b.dataset.sort === field && b.dataset.dir === currentSort.dir));
     render();
   });
 });
-document.getElementById("filter").addEventListener("input", (e) => { filterText = e.target.value; render(); });
-renderVolatility();
-render();
+document.getElementById("filter").addEventListener("input", (e) => {
+  filterText = e.target.value;
+  render();
+});
+
+// ============================================================
+//  Init
+// ============================================================
+loadData();
 </script></body></html>

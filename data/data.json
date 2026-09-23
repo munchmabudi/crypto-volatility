@@ -1,0 +1,166 @@
+{
+  "generated_at": "Sep 23, 2026 15:57 UTC",
+  "analysis": [],
+  "volatility": {
+    "BTC": {
+      "cc_vol": 40.438944018163575,
+      "pk_vol": 35.51982830482148,
+      "har_forecast": 40.434795818555614
+    },
+    "ETH": {
+      "cc_vol": 46.75184882669174,
+      "pk_vol": 46.03910585634364,
+      "har_forecast": 44.113211508969705
+    },
+    "SOL": {
+      "cc_vol": 60.24859246859977,
+      "pk_vol": 55.650435162571334,
+      "har_forecast": 58.437357732608454
+    },
+    "XRP": {
+      "cc_vol": 87.32978163595507,
+      "pk_vol": 77.10991618233301,
+      "har_forecast": 86.39800657272892
+    },
+    "ADA": {
+      "cc_vol": 88.29624077579192,
+      "pk_vol": 79.53889757021352,
+      "har_forecast": 91.63210276715874
+    },
+    "LTC": {
+      "cc_vol": 74.95752288399883,
+      "pk_vol": 67.5024073110341,
+      "har_forecast": 81.46391150695122
+    },
+    "DOGE": {
+      "cc_vol": 82.06602254013875,
+      "pk_vol": 79.02211735732566,
+      "har_forecast": 91.60492167005265
+    },
+    "AVAX": {
+      "cc_vol": 125.30438317876533,
+      "pk_vol": 103.10655942634996,
+      "har_forecast": 127.8968987206957
+    },
+    "LINK": {
+      "cc_vol": 69.64454727826957,
+      "pk_vol": 64.86994135572614,
+      "har_forecast": 71.55035584391516
+    },
+    "SUI": {
+      "cc_vol": 112.97324421383496,
+      "pk_vol": 100.99181570173658,
+      "har_forecast": 112.08180254364639
+    },
+    "BNB": {
+      "cc_vol": 41.88724934513158,
+      "pk_vol": 37.410582922664155,
+      "har_forecast": 43.360722933158065
+    },
+    "HYPE": {
+      "cc_vol": 67.98735589870299,
+      "pk_vol": 62.37521593387799,
+      "har_forecast": 66.40632069811507
+    },
+    "DOT": {
+      "cc_vol": 101.61333799947876,
+      "pk_vol": 85.60362618407625,
+      "har_forecast": 103.10305865546887
+    },
+    "XLM": {
+      "cc_vol": 100.42453035659598,
+      "pk_vol": 84.33154181691351,
+      "har_forecast": 98.83216986719997
+    },
+    "SHIB": {
+      "cc_vol": 0.0,
+      "pk_vol": 0.0,
+      "har_forecast": 0.0
+    },
+    "HBAR": {
+      "cc_vol": 95.2245435128548,
+      "pk_vol": 83.42844912213624,
+      "har_forecast": 99.19404019456535
+    },
+    "BCH": {
+      "cc_vol": 135.1682918966538,
+      "pk_vol": 109.14768210721026,
+      "har_forecast": 142.4994613997947
+    }
+  },
+  "volumes": {
+    "BTC": 3699542752.913945,
+    "ETH": 1449309179.7310414,
+    "SOL": 377151319.71520025,
+    "XRP": 275107280.49779975,
+    "ADA": 14698357.408219991,
+    "LTC": 33064019.183029987,
+    "DOGE": 54784258.16992498,
+    "AVAX": 26736715.77346001,
+    "LINK": 21325882.437299997,
+    "SUI": 41609498.122974046,
+    "BNB": 13118885.400499996,
+    "HYPE": 713567200.5373605,
+    "DOT": 3851910.448239999,
+    "XLM": 6823885.839779999,
+    "SHIB": 151698156.331243,
+    "HBAR": 3443997.5066460017,
+    "BCH": 53038119.47306995
+  },
+  "token_colors": {
+    "BTC": "#f7931a",
+    "ETH": "#627eea",
+    "SOL": "#9945ff",
+    "XRP": "#23292f",
+    "ADA": "#0033ad",
+    "LTC": "#345d9d",
+    "DOGE": "#c2a633",
+    "AVAX": "#e84142",
+    "LINK": "#2a5ada",
+    "SUI": "#4da2ff",
+    "BNB": "#f3ba2f",
+    "HYPE": "#8b5cf6",
+    "DOT": "#e6007a",
+    "XLM": "#7d00ff",
+    "SHIB": "#ffa409",
+    "HBAR": "#00b39f",
+    "BCH": "#8dc351"
+  },
+  "danger_zones": {
+    "alts": {
+      "within_1pct": [],
+      "within_2pct": [],
+      "within_5pct": []
+    },
+    "majors": {
+      "within_1pct": [],
+      "within_2pct": [],
+      "within_5pct": []
+    }
+  },
+  "whale_wallets": [
+    {
+      "address": "0x77ddcc4b6440b3a32b7802f053105c2fad3ae0e9",
+      "label": "Leviathan",
+      "token": "ETH",
+      "direction": "LONG",
+      "size": 41228.487,
+      "notional": 109655406.8739,
+      "entry_price": 2693.92,
+      "liq_price": 2514.0670605886,
+      "dist_to_liq_pct": -5.475540076377036,
+      "leverage": 10,
+      "pnl": -1410841.76398,
+      "roi_30d": -1.2866139520164477,
+      "side": "long"
+    }
+  ],
+  "data_sources": {
+    "prices": "Hyperliquid API (hyperliquid.xyz)",
+    "volumes": "Hyperliquid API",
+    "candles": "Hyperliquid candleSnapshot",
+    "liquidations_majors": "SmartMoneyAPI free tier",
+    "liquidations_alts": "not available (set HYPERTRACKER_API_KEY)",
+    "whale_wallets": "Hyperliquid clearinghouseState (public)"
+  }
+}
