@@ -159,17 +159,92 @@ def fetch_liquidation_clusters_smartmoney(token):
 
 
 def fetch_liquidation_heatmap_hypertracker(token, ht_key):
-    """Fetch liquidation heatmap from HyperTracker API."""
+    """Fetch liquidation clusters from HyperTracker API, with positions fallback.
+
+    Tries the heatmap export first; if that fails, fetches individual open
+    positions and aggregates them into price bins.
+    """
+    import time as _time
+
+    # --- Attempt 1: liquidation heatmap (pre-aggregated bins) ---
+    for attempt in range(2):
+        try:
+            heatmap = hypertracker.get_liquidation_heatmap(token, token=ht_key)
+            if heatmap:
+                print(f"      HyperTracker {token}: {len(heatmap)} heatmap bins")
+                # Convert heatmap bins to cluster format
+                clusters = []
+                for bin in heatmap:
+                    try:
+                        price_start = float(bin.get("priceBinStart", 0))
+                        price_end = float(bin.get("priceBinEnd", 0))
+                        liq_value = float(bin.get("liquidationValue", 0))
+                        positions = int(bin.get("positionsCount", 0))
+                        if liq_value > 0:
+                            mid_price = (price_start + price_end) / 2
+                            clusters.append({
+                                "price": mid_price,
+                                "notional": liq_value,
+                                "count": positions,
+                                "dominant_side": bin.get("mostImpactedSegment", "long"),
+                            })
+                    except (TypeError, KeyError, ValueError) as ve:
+                        print(f"      HyperTracker {token}: bad bin data ({ve})")
+                        continue
+                if clusters:
+                    return clusters
+                print(f"      HyperTracker {token}: heatmap returned {len(heatmap)} bins but 0 valid clusters")
+            else:
+                print(f"      HyperTracker {token}: heatmap returned empty (attempt {attempt + 1})")
+        except hypertracker.HyperTrackerError as e:
+            print(f"      HyperTracker {token}: {e}")
+        except Exception as e:
+            print(f"      HyperTracker {token}: unexpected error ({type(e).__name__}): {e}")
+        _time.sleep(1)
+
+    # --- Attempt 2: open positions (aggregate ourselves) ---
     try:
-        heatmap = hypertracker.get_liquidation_heatmap(token, token=ht_key)
-        print(f"      HyperTracker {token}: {len(heatmap)} heatmap bins")
-        return heatmap
+        positions = hypertracker.get_open_positions(token, token=ht_key)
+        if positions:
+            print(f"      HyperTracker {token}: {len(positions)} open positions (aggregated)")
+            # Aggregate positions by liquidation price into bins
+            bins = {}
+            bin_size = 0.01  # 0.01 price units, relative to price
+            for pos in positions:
+                try:
+                    liq_price = float(pos.get("liquidationPrice", 0))
+                    value = float(pos.get("value", 0))
+                    side = pos.get("side", "long")
+                    if liq_price > 0 and value > 0:
+                        bin_key = round(liq_price / bin_size) * bin_size
+                        if bin_key not in bins:
+                            bins[bin_key] = {"notional": 0, "count": 0, "long": 0, "short": 0}
+                        bins[bin_key]["notional"] += value
+                        bins[bin_key]["count"] += 1
+                        if "long" in str(side).lower():
+                            bins[bin_key]["long"] += value
+                        else:
+                            bins[bin_key]["short"] += value
+                except (TypeError, ValueError):
+                    continue
+
+            clusters = []
+            for price, data in sorted(bins.items()):
+                dominant = "long" if data["long"] > data["short"] else "short"
+                clusters.append({
+                    "price": price,
+                    "notional": data["notional"],
+                    "count": data["count"],
+                    "dominant_side": dominant,
+                })
+            return clusters
     except hypertracker.HyperTrackerError as e:
-        print(f"      HyperTracker {token}: {e}")
-        return []
+        print(f"      HyperTracker {token} positions: {e}")
     except Exception as e:
-        print(f"      HyperTracker {token}: {e}")
-        return []
+        print(f"      HyperTracker {token} positions: {type(e).__name__}: {e}")
+
+    print(f"      HyperTracker {token}: no liquidation data from any endpoint")
+    return []
 
 
 def fetch_whale_positions(ht_key=None):
