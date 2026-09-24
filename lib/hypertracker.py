@@ -3,11 +3,21 @@
 Requires an API key set via the HYPERTRACKER_API_KEY env var.
 
 Key endpoints:
-  - /api/external/exports/coins/{coin}/liquidation-heatmap  (302 → pre-signed JSON)
-  - /api/external/positions/open/coin/{coin}                 (302 → pre-signed CSV/JSON)
+  - /api/external/exports/coins/{coin}/liquidation-heatmap  (302 → pre-signed JSON or CSV)
+  - /api/external/positions/open/coin/{coin}                 (302 → pre-signed JSON or CSV)
   - /api/external/trader/{address}                           (wallet-level data)
-""";
-import json, os, urllib.request, urllib.error;
+
+Some endpoints issue a 302 redirect to a pre-signed S3/Cloud URL.  Those URLs
+serve CSV by default (the Accept header is not always honoured on S3).  We
+handle both JSON and CSV transparently.
+"""
+import csv
+import io
+import json
+import os
+import urllib.request
+import urllib.error
+
 
 BASE_URL = "https://ht-api.coinmarketman.com/api/external"
 
@@ -19,17 +29,14 @@ class HyperTrackerError(Exception):
 # --------------------------------------------------------------------------- #
 #  Low-level HTTP
 # --------------------------------------------------------------------------- #
-class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Capture 302 redirects so we can inspect / retry the Location URL."""
-    def __init__(self):
-        self.redirect_url = None
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        self.redirect_url = newurl
-        return None  # don't auto-follow
+def _get_raw(path, token=None, timeout=120):
+    """GET request to HyperTracker, following the 302 to a pre-signed URL.
 
-
-def _get_raw(path, token=None, timeout=60, follow_redirects=True):
-    """GET request to HyperTracker, optionally following the 302 to a pre-signed URL."""
+    Returns a tuple ``(data, resp)`` where *data* is one of:
+      - parsed JSON (dict or list)
+      - raw text string (if JSON parsing failed — caller may need CSV parse)
+      - bytes (fallback)
+    """
     key = token or os.environ.get("HYPERTRACKER_API_KEY", "")
     url = f"{BASE_URL}/{path}"
     headers = {
@@ -43,13 +50,12 @@ def _get_raw(path, token=None, timeout=60, follow_redirects=True):
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
         body = resp.read()
-        # Try JSON first; fall back to text (some endpoints return CSV text)
         try:
             return json.loads(body), resp
         except (json.JSONDecodeError, ValueError):
-            return body.decode("utf-8", errors="replace"), resp
+            # Not JSON — might be CSV text
+            return body, resp
     except urllib.error.HTTPError as e:
-        # Read the error body for diagnostics
         err_body = ""
         try:
             err_body = e.read().decode("utf-8", errors="replace")[:500]
@@ -60,20 +66,36 @@ def _get_raw(path, token=None, timeout=60, follow_redirects=True):
         raise HyperTrackerError(f"HTTP {e.code} for {path}. Body: {err_body}")
 
 
-def _get(path, token=None, timeout=60):
-    """GET request, following the 302 redirect that export endpoints issue.
+def _parse_body(body, token=None, path=""):
+    """Fetch and return parsed data, trying JSON then CSV.
 
-    Returns parsed JSON (dict or list).
+    If *body* is bytes that aren't JSON, attempts CSV parsing.
+    Returns the parsed result or raises HyperTrackerError on genuine errors.
     """
-    result, _ = _get_raw(path, token=token, timeout=timeout)
-    if isinstance(result, bytes):
-        result = result.decode("utf-8", errors="replace")
-    if isinstance(result, str):
-        try:
-            result = json.loads(result)
-        except (json.JSONDecodeError, ValueError):
-            pass
-    return result
+    if isinstance(body, (dict, list)):
+        return body
+    if isinstance(body, bytes):
+        text = body.decode("utf-8", errors="replace")
+    else:
+        text = str(body)
+
+    # Try JSON
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Try CSV
+    try:
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+        if rows and len(rows) > 0:
+            return rows
+    except Exception:
+        pass
+
+    # Couldn't parse — return raw text for diagnostics
+    return text
 
 
 # --------------------------------------------------------------------------- #
@@ -82,23 +104,21 @@ def _get(path, token=None, timeout=60):
 def get_liquidation_heatmap(coin, token=None):
     """Download the liquidation heatmap for a single coin.
 
-    Returns a list of dicts with keys (depending on API version):
-      priceBinStart, priceBinEnd, liquidationValue, positionsCount,
-      mostImpactedSegment
+    Handles both JSON and CSV response formats (pre-signed URLs may serve
+    either depending on the S3 bucket configuration).
+
+    Returns a list of dicts.  Each dict has at least:
+      priceBinStart, priceBinEnd, liquidationValue, positionsCount
     """
-    result = _get(f"exports/coins/{coin}/liquidation-heatmap", token=token)
-    # The pre-signed URL might return the data nested under different keys
-    if isinstance(result, dict):
+    data = _fetch(coin, "exports/coins/{coin}/liquidation-heatmap", token)
+    if isinstance(data, dict):
         for key in ("heatmap", "data", "bins", "levels"):
-            if key in result:
-                val = result[key]
-                if isinstance(val, list):
-                    return val
-        # Maybe the result IS the heatmap directly
-        if "priceBinStart" in result:
-            return [result]
-    if isinstance(result, list):
-        return result
+            if key in data and isinstance(data[key], list):
+                return data[key]
+        if "priceBinStart" in data:
+            return [data]
+    elif isinstance(data, list):
+        return data
     return []
 
 
@@ -112,13 +132,13 @@ def get_open_positions(coin, token=None):
       address, coin, side, size, value, entryPrice, liquidationPrice,
       crossLeverage, liquidationProgress, unrealizedPnl, funding
     """
-    result = _get(f"positions/open/coin/{coin}", token=token)
-    if isinstance(result, list):
-        return result
-    if isinstance(result, dict):
+    data = _fetch(coin, "positions/open/coin/{coin}", token)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
         for key in ("positions", "data", "rows"):
-            if key in result and isinstance(result[key], list):
-                return result[key]
+            if key in data and isinstance(data[key], list):
+                return data[key]
     return []
 
 
@@ -128,9 +148,28 @@ def get_open_positions(coin, token=None):
 def get_wallet_info(address, token=None):
     """Fetch wallet-level info from HyperTracker."""
     try:
-        result = _get(f"trader/{address}", token=token)
-        if result and not (isinstance(result, dict) and "error" in result):
-            return result
+        data = _fetch(address, "trader/{address}", token, is_address=True)
+        if data and not (isinstance(data, dict) and "error" in str(data)):
+            return data
+    except HyperTrackerError:
+        raise
     except Exception:
         pass
     return {}
+
+
+# --------------------------------------------------------------------------- #
+#  Internal: fetch + parse with CSV fallback
+# --------------------------------------------------------------------------- #
+def _fetch(coin, path_template, token=None, is_address=False):
+    """Fetch from HyperTracker, handling 302 redirect + CSV fallback.
+
+    Args:
+        coin: coin symbol (e.g. "XRP") or address string
+        path_template: e.g. "exports/coins/{coin}/liquidation-heatmap"
+        token: HyperTracker API key (optional, uses env var if not given)
+        is_address: if True, *coin* is an address, not a coin symbol
+    """
+    path = path_template.format(coin=coin, address=coin)
+    body, _resp = _get_raw(path, token=token)
+    return _parse_body(body, token=token, path=path)

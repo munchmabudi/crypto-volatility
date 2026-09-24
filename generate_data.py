@@ -171,25 +171,36 @@ def fetch_liquidation_heatmap_hypertracker(token, ht_key):
         try:
             heatmap = hypertracker.get_liquidation_heatmap(token, token=ht_key)
             if heatmap:
-                print(f"      HyperTracker {token}: {len(heatmap)} heatmap bins")
+                if isinstance(heatmap, list) and len(heatmap) > 0:
+                    print(f"      HyperTracker {token}: {len(heatmap)} heatmap bins (raw type: {type(heatmap[0]).__name__})")
+                    # Check field names
+                    sample = heatmap[0]
+                    if isinstance(sample, dict):
+                        print(f"      HyperTracker {token}: bin keys = {list(sample.keys())[:10]}")
                 # Convert heatmap bins to cluster format
                 clusters = []
                 for bin in heatmap:
                     try:
-                        price_start = float(bin.get("priceBinStart", 0))
-                        price_end = float(bin.get("priceBinEnd", 0))
-                        liq_value = float(bin.get("liquidationValue", 0))
-                        positions = int(bin.get("positionsCount", 0))
+                        price_start = float(bin.get("priceBinStart", bin.get("price_bin_start", bin.get("startPrice", 0))))
+                        price_end = float(bin.get("priceBinEnd", bin.get("price_bin_end", bin.get("endPrice", price_start))))
+                        liq_value = float(bin.get("liquidationValue", bin.get("liquidation_value", bin.get("value", 0))))
+                        positions = int(bin.get("positionsCount", bin.get("positions_count", bin.get("count", 0))))
                         if liq_value > 0:
                             mid_price = (price_start + price_end) / 2
+                            segment = bin.get("mostImpactedSegment", bin.get("most_impacted_segment", "long"))
+                            # segment might be a number — 0=long, 1=short or similar
+                            if isinstance(segment, (int, float)):
+                                dominant_side = "short" if segment == 1 else "long"
+                            else:
+                                dominant_side = str(segment)
                             clusters.append({
                                 "price": mid_price,
                                 "notional": liq_value,
                                 "count": positions,
-                                "dominant_side": bin.get("mostImpactedSegment", "long"),
+                                "dominant_side": dominant_side,
                             })
                     except (TypeError, KeyError, ValueError) as ve:
-                        print(f"      HyperTracker {token}: bad bin data ({ve})")
+                        print(f"      HyperTracker {token}: bad bin data ({ve}) — sample: {str(bin)[:200]}")
                         continue
                 if clusters:
                     return clusters
@@ -207,13 +218,15 @@ def fetch_liquidation_heatmap_hypertracker(token, ht_key):
         positions = hypertracker.get_open_positions(token, token=ht_key)
         if positions:
             print(f"      HyperTracker {token}: {len(positions)} open positions (aggregated)")
+            print(f"      HyperTracker {token}: pos keys = {list(positions[0].keys())[:10]}")
             # Aggregate positions by liquidation price into bins
             bins = {}
             bin_size = 0.01  # 0.01 price units, relative to price
+            valid_count = 0
             for pos in positions:
                 try:
-                    liq_price = float(pos.get("liquidationPrice", 0))
-                    value = float(pos.get("value", 0))
+                    liq_price = float(pos.get("liquidationPrice", pos.get("liquidation_price", pos.get("liqPx", pos.get("liq_price", 0)))))
+                    value = float(pos.get("value", pos.get("positionValue", pos.get("notional", 0))))
                     side = pos.get("side", "long")
                     if liq_price > 0 and value > 0:
                         bin_key = round(liq_price / bin_size) * bin_size
@@ -227,6 +240,7 @@ def fetch_liquidation_heatmap_hypertracker(token, ht_key):
                             bins[bin_key]["short"] += value
                 except (TypeError, ValueError):
                     continue
+            print(f"      HyperTracker {token}: {valid_count} valid positions with liq_price + value")
 
             clusters = []
             for price, data in sorted(bins.items()):
