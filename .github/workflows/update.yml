@@ -32,8 +32,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Generate dashboard data
-        env:
-          HYPERTRACKER_API_KEY: ${{ secrets.HYPERTRACKER_API_KEY }}
         run: |
           python generate_data.py --output data/data.json
 

@@ -20,7 +20,6 @@ Outputs:
 
 Usage:
     python generate_data.py                  # writes data/data.json
-    HYPERTRACKER_API_KEY=... python generate_data.py
     python generate_data.py --self-contained # also rewrites index.html with inline data
 """
 import argparse
@@ -36,7 +35,6 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
 import hyperliquid   # noqa: E402
 import volatility    # noqa: E402
-import hypertracker  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 #  Configuration
@@ -158,124 +156,7 @@ def fetch_liquidation_clusters_smartmoney(token):
     return []
 
 
-def fetch_liquidation_heatmap_hypertracker(token, ht_key):
-    """Fetch liquidation clusters from HyperTracker API, with positions fallback.
-
-    Tries the heatmap export first; if that fails, fetches individual open
-    positions and aggregates them into price bins.
-    """
-    import time as _time
-
-    # --- Pre-flight: check token balance once ---
-    try:
-        balance = hypertracker.get_balance(token=ht_key)
-        if balance <= 0:
-            print(f"      HyperTracker {token}: SKIPPED — API key balance is 0 (add tokens at coinmarketman.com)")
-            return []
-        print(f"      HyperTracker {token}: API key balance = {balance} tokens")
-    except hypertracker.HyperTrackerError as e:
-        if "402" in str(e) or "insufficient_tokens" in str(e):
-            print(f"      HyperTracker {token}: SKIPPED — API key has 0 token balance (add credits at coinmarketman.com)")
-            return []
-        # Non-402 error is unexpected — let it show but don't block
-        print(f"      HyperTracker {token}: balance check failed — {e}")
-
-    # --- Attempt 1: liquidation heatmap (pre-aggregated bins) ---
-    for attempt in range(2):
-        try:
-            heatmap = hypertracker.get_liquidation_heatmap(token, token=ht_key)
-            if heatmap:
-                if isinstance(heatmap, list) and len(heatmap) > 0:
-                    print(f"      HyperTracker {token}: {len(heatmap)} heatmap bins (raw type: {type(heatmap[0]).__name__})")
-                    # Check field names
-                    sample = heatmap[0]
-                    if isinstance(sample, dict):
-                        print(f"      HyperTracker {token}: bin keys = {list(sample.keys())[:10]}")
-                # Convert heatmap bins to cluster format
-                clusters = []
-                for bin in heatmap:
-                    try:
-                        price_start = float(bin.get("priceBinStart", bin.get("price_bin_start", bin.get("startPrice", 0))))
-                        price_end = float(bin.get("priceBinEnd", bin.get("price_bin_end", bin.get("endPrice", price_start))))
-                        liq_value = float(bin.get("liquidationValue", bin.get("liquidation_value", bin.get("value", 0))))
-                        positions = int(bin.get("positionsCount", bin.get("positions_count", bin.get("count", 0))))
-                        if liq_value > 0:
-                            mid_price = (price_start + price_end) / 2
-                            segment = bin.get("mostImpactedSegment", bin.get("most_impacted_segment", "long"))
-                            # segment might be a number — 0=long, 1=short or similar
-                            if isinstance(segment, (int, float)):
-                                dominant_side = "short" if segment == 1 else "long"
-                            else:
-                                dominant_side = str(segment)
-                            clusters.append({
-                                "price": mid_price,
-                                "notional": liq_value,
-                                "count": positions,
-                                "dominant_side": dominant_side,
-                            })
-                    except (TypeError, KeyError, ValueError) as ve:
-                        print(f"      HyperTracker {token}: bad bin data ({ve}) — sample: {str(bin)[:200]}")
-                        continue
-                if clusters:
-                    return clusters
-                print(f"      HyperTracker {token}: heatmap returned {len(heatmap)} bins but 0 valid clusters")
-            else:
-                print(f"      HyperTracker {token}: heatmap returned empty (attempt {attempt + 1})")
-        except hypertracker.HyperTrackerError as e:
-            print(f"      HyperTracker {token}: {e}")
-        except Exception as e:
-            print(f"      HyperTracker {token}: unexpected error ({type(e).__name__}): {e}")
-        _time.sleep(1)
-
-    # --- Attempt 2: open positions (aggregate ourselves) ---
-    try:
-        positions = hypertracker.get_open_positions(token, token=ht_key)
-        if positions:
-            print(f"      HyperTracker {token}: {len(positions)} open positions (aggregated)")
-            print(f"      HyperTracker {token}: pos keys = {list(positions[0].keys())[:10]}")
-            # Aggregate positions by liquidation price into bins
-            bins = {}
-            bin_size = 0.01  # 0.01 price units, relative to price
-            valid_count = 0
-            for pos in positions:
-                try:
-                    liq_price = float(pos.get("liquidationPrice", pos.get("liquidation_price", pos.get("liqPx", pos.get("liq_price", 0)))))
-                    value = float(pos.get("value", pos.get("positionValue", pos.get("notional", 0))))
-                    side = pos.get("side", "long")
-                    if liq_price > 0 and value > 0:
-                        bin_key = round(liq_price / bin_size) * bin_size
-                        if bin_key not in bins:
-                            bins[bin_key] = {"notional": 0, "count": 0, "long": 0, "short": 0}
-                        bins[bin_key]["notional"] += value
-                        bins[bin_key]["count"] += 1
-                        if "long" in str(side).lower():
-                            bins[bin_key]["long"] += value
-                        else:
-                            bins[bin_key]["short"] += value
-                except (TypeError, ValueError):
-                    continue
-            print(f"      HyperTracker {token}: {valid_count} valid positions with liq_price + value")
-
-            clusters = []
-            for price, data in sorted(bins.items()):
-                dominant = "long" if data["long"] > data["short"] else "short"
-                clusters.append({
-                    "price": price,
-                    "notional": data["notional"],
-                    "count": data["count"],
-                    "dominant_side": dominant,
-                })
-            return clusters
-    except hypertracker.HyperTrackerError as e:
-        print(f"      HyperTracker {token} positions: {e}")
-    except Exception as e:
-        print(f"      HyperTracker {token} positions: {type(e).__name__}: {e}")
-
-    print(f"      HyperTracker {token}: no liquidation data from any endpoint")
-    return []
-
-
-def fetch_whale_positions(ht_key=None):
+def fetch_whale_positions():
     """Fetch positions for tracked whale wallets.
 
     Uses Hyperliquid's public clearinghouseState endpoint (no key needed)
@@ -393,7 +274,7 @@ def build_level(price, current_price, daily_vol_pct, cumulative_notional,
     }
 
 
-def process_token(token, hl_data, vol_data, ht_key):
+def process_token(token, hl_data, vol_data):
     """Process a single token: fetch liquidation data and build analysis entry."""
     current_price = hl_data["current_price"]
     daily_volume = hl_data["volume"]
@@ -403,19 +284,8 @@ def process_token(token, hl_data, vol_data, ht_key):
     clusters = []
     if token in MAJORS:
         clusters = fetch_liquidation_clusters_smartmoney(token)
-    elif ht_key:
-        heatmap = fetch_liquidation_heatmap_hypertracker(token, ht_key)
-        # Convert heatmap bins to clusters
-        for bin in heatmap:
-            mid = (float(bin["priceBinStart"]) + float(bin["priceBinEnd"])) / 2
-            clusters.append({
-                "price": mid,
-                "notional": float(bin.get("liquidationValue", 0)),
-                "count": int(bin.get("positionsCount", 0)),
-                "dominant_side": "long" if mid < current_price else "short",
-            })
     else:
-        print(f"      {token}: no liquidation data source (set HYPERTRACKER_API_KEY)")
+        print(f"      {token}: no liquidation data source (SmartMoneyAPI free tier covers BTC/ETH/SOL only)")
         return None
 
     if not clusters:
@@ -513,12 +383,6 @@ def main():
                         help="Output JSON path (default: data/data.json)")
     args = parser.parse_args()
 
-    ht_key = os.environ.get("HYPERTRACKER_API_KEY")
-    if ht_key:
-        print("HyperTracker API key found.")
-    else:
-        print("No HYPERTRACKER_API_KEY set — altcoin liquidations will be limited.")
-
     # ----------------------------------------------------------------------- #
     #  Step 1: Fetch Hyperliquid perps + candles
     # ----------------------------------------------------------------------- #
@@ -568,7 +432,7 @@ def main():
         v = vol_data.get(token)
         if v is None:
             continue
-        entry = process_token(token, d, v, ht_key)
+        entry = process_token(token, d, v)
         if entry:
             analysis.append(entry)
         else:
@@ -583,7 +447,7 @@ def main():
     print("\n[4/4] Computing danger zones + whale wallets ...")
     danger_zones = compute_danger_zones(analysis)
 
-    whale_wallets = fetch_whale_positions(ht_key)
+    whale_wallets = fetch_whale_positions()
     print(f"      Whale wallets tracked: {len(whale_wallets)}")
 
     # ----------------------------------------------------------------------- #
@@ -604,7 +468,7 @@ def main():
             "volumes": "Hyperliquid API",
             "candles": "Hyperliquid candleSnapshot",
             "liquidations_majors": "SmartMoneyAPI free tier",
-            "liquidations_alts": "HyperTracker API" if ht_key else "not available (set HYPERTRACKER_API_KEY)",
+            "liquidations_alts": "not available (SmartMoneyAPI free tier covers BTC/ETH/SOL only)",
             "whale_wallets": "Hyperliquid clearinghouseState (public)",
         },
     }
