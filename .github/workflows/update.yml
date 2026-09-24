@@ -13,6 +13,8 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to push data.json back to the repo
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -41,6 +43,8 @@ jobs:
           echo "data.json size: $(wc -c < data/data.json) bytes"
 
       - name: Commit and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
