@@ -26,6 +26,16 @@ class HyperTrackerError(Exception):
     pass
 
 
+def get_balance(token=None):
+    """Check the API key's remaining token balance.
+
+    Returns an integer (remaining calls) or raises HyperTrackerError.
+    """
+    data = _fetch("", "balance", token=token)
+    if isinstance(data, dict):
+        return int(data.get("balance", data.get("tokens", 0)))
+
+
 # --------------------------------------------------------------------------- #
 #  Low-level HTTP
 # --------------------------------------------------------------------------- #

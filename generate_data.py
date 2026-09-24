@@ -166,6 +166,20 @@ def fetch_liquidation_heatmap_hypertracker(token, ht_key):
     """
     import time as _time
 
+    # --- Pre-flight: check token balance once ---
+    try:
+        balance = hypertracker.get_balance(token=ht_key)
+        if balance <= 0:
+            print(f"      HyperTracker {token}: SKIPPED — API key balance is 0 (add tokens at coinmarketman.com)")
+            return []
+        print(f"      HyperTracker {token}: API key balance = {balance} tokens")
+    except hypertracker.HyperTrackerError as e:
+        if "402" in str(e) or "insufficient_tokens" in str(e):
+            print(f"      HyperTracker {token}: SKIPPED — API key has 0 token balance (add credits at coinmarketman.com)")
+            return []
+        # Non-402 error is unexpected — let it show but don't block
+        print(f"      HyperTracker {token}: balance check failed — {e}")
+
     # --- Attempt 1: liquidation heatmap (pre-aggregated bins) ---
     for attempt in range(2):
         try:
